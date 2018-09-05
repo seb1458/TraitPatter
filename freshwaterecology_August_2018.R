@@ -36,6 +36,6 @@ freshecol_db1 = freshecol_db[-grep("[[:upper:]]{3}", freshecol_db$Taxon), ]
 
 # Delete rows with just NA values
 ind = apply(freshecol_db1[,-1], MARGIN = 1, function(y) all(is.na(y)) )
-freshecol_db1[-ind,]
+freshecol_db1 = freshecol_db1[-ind,]
 
 # 
