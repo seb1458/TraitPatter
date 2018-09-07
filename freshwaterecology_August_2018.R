@@ -30,6 +30,7 @@ freshecol_db = freshecol_db[, !names(freshecol_db) == "EU"]
 
 # rename taxa column
 names(freshecol_db)[1] = "Taxon"
+str(freshecol_db1)
 
 # delete Family names
 freshecol_db1 = freshecol_db[-grep("[[:upper:]]{3}", freshecol_db$Taxon), ]
