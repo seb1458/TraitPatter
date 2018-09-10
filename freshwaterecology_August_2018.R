@@ -39,66 +39,20 @@ ind = apply(freshecol_db1[,-1], MARGIN = 1, function(y) all(is.na(y)) )
 freshecol_db1 = freshecol_db1[!ind,]
             
 #### Preparation: European database ####
-df_EUR <- read.csv(file.path(path, "Europe", "Freshwaterecol_Aug_2018.csv"), stringsAsFactors = FALSE)
+df_EUR <- freshecol_db1
+# df_EUR <- read.csv(file.path(path, "Europe", "Freshwaterecol_Aug_2018.csv"), stringsAsFactors = FALSE)
 
-row_del <- grep("[[:punct:]]", df_EUR$Taxon, ignore.case = TRUE)
+# Delete all entries with "Ad.", "(karstic)" and "Corbicula 'fluminalis'"
+row_del <- grep("Ad.$|karst|Corbicula", df_EUR$Taxon)
 df_EUR <- df_EUR[-row_del, ]
 
-#### Get taxa information
-# Two Species can not be found in the gbif database. 
-# 1. Lepidostoma doehleri is missing. Belongs to the family Lepidostoma.
-# 2. Holostomis phalaenoides is also known as Phryganea phalaenoides (https://eprints.lib.hokudai.ac.jp/dspace/bitstream/2115/22222/1/2_P1-6.pdf).
-spec_gbif <- df_EUR$Taxon[df_EUR$Taxon != "Lepidostoma doehleri" & df_EUR$Taxon != "Holostomis phalaenoides"]
-spec_nbn <- c("Lepidostoma doehleri", "Phryganea phalaenoides")
+# Delete "Lv." from species names
+del <- "Lv."
 
-# Get family and genus levels from "Global Biodiversity Information Facility" (gbif)
-tax_gbif <- get_ids(names = spec_gbif, db = "gbif")
-cl_gbif <- cbind(classification(tax_gbif$gbif, return_id = FALSE)); beep(4)
-
-# Get missing family and genus levels from "National Biodiversity Network" (nbn)
-tax_nbn <- get_ids(names = spec_nbn, db = "nbn")
-cl_nbn <- cbind(classification(tax_nbn$nbn, return_id = FALSE))
-
-# Combine all necessary taxa info (order, family, genus) into one dataframe
-class_full <- rbind(cl_gbif[4:7], cl_nbn[6:9])
-class_full <- class_full[c(1:448, 3532, 449:871, 3533, 872:3531), ]
-
-df_EUR_complete <- cbind(df_EUR, class_full)
-df_EUR_complete <- df_EUR_complete %>%
-  select(order:genus, Taxon:order)
-
-write.table(df_EUR_complete, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR.csv", sep = ",")
-
-#### Add trait size from Tachet database via table join
-tachet <- read.csv(file.path(path, "Europe", "Tachet_mod_csv.csv"), stringsAsFactors = FALSE)[, c(1:14)]
-df_EUR <- read.csv(file.path(path, "Europe", "macroinvertebrate_EUR.csv"), stringsAsFactors = FALSE)
-
-# Merge df_EUR with size information from Tachet
-EU_size <- df_EUR[, 3:4]
-
-# 1. Merge on species level
-EU_size <- merge(EU_size, tachet, by.x = "Taxon", by.y = "taxa", all.x =  TRUE)
-
-# 2. Merge on genus level
-EU_size <- merge(EU_size, tachet, by.x = "genus.x", by.y = "taxa", all.x =  TRUE)
-
-# 3. Combine size columns and add to df_EU
-EU_size <- EU_size %>%
-  transmute(size_1 = size_1.x + size_1.y,
-            size_2 = size_2.x + size_2.y,
-            size_3 = size_3.x + size_3.y,
-            size_4 = size_4.x + size_4.y,
-            size_5 = size_5.x + size_5.y,
-            size_6 = size_6.x + size_6.y,
-            size_7 = size_7.x + size_7.y)
-
-df_EUR <- cbind(df_EUR, EU_size)
-
-write.table(df_EUR, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR.csv", sep = ",")
+df_EUR$Taxon <- str_trim(gsub(paste0(del,collapse = "|"), "", df_EUR$Taxon)) 
+# str_trim() to delete whitespace at the end of the species name
 
 #### Renaming columns
-df_EUR <- read.csv(file.path(path, "Europe", "macroinvertebrate_EUR.csv"))
-
 
 ## Microhabitat
 names(df_EUR)[grep(c("pel$|arg$|psa$|aka$|mil$|mal$|hpe$|alg$|mph$|pom$|woo$|mad$|oth$"), names(df_EUR))] <- 
@@ -193,7 +147,7 @@ names(df_EUR)[grep(c("gra$|min$|xyl$|shr$|gat$|aff$|pff$|pre$|par$|oth.1$"), nam
 
 
 ## Locomotion
-names(df_EUR)[grep(c("sws$|swd$|$|bub$|spw$|ses$|oth.2$"), names(df_EUR))] <- 
+names(df_EUR)[grep(c("sws$|swd$|bub$|spw$|ses$|oth.2$"), names(df_EUR))] <- 
   c("locom_swim_skate", "locom_swim_dive", "locom_burrow", "locom_sprawl", "locom_sessil", "locom_other")
 
 # Explanation:  locom_swim_skate: swimming/scating - floating in lakes or drifting in rivers passively
@@ -218,7 +172,7 @@ names(df_EUR)[grep(c("teg|gil|pls|spi|ves|tap|sur"), names(df_EUR))] <-
 
 
 ## Resistance form
-names(df_EUR)[grep(c("egg|coc|hou|did|qui|non"), names(df_EUR))] <- 
+names(df_EUR)[grep(c("egg$|coc|hou|did|qui|non"), names(df_EUR))] <- 
   c("res_egg_stato", "res_cocoon", "res_house", "res_diapause_dormancy", "res_quiesence", "res_non")
 
 # Explanation:  res_egg_stato:          eggs, statoblasts
@@ -240,7 +194,7 @@ names(df_EUR)[grep(c("aqp|aqa|aep|aea"), names(df_EUR))] <-
 
 
 ## Dispercal capacity
-names(df_EUR)[grep(c("hig|low|unk|"), names(df_EUR))] <- 
+names(df_EUR)[grep(c("hig|low|unk"), names(df_EUR))] <- 
   c("dispersal_high", "dispersal_low", "dispersal_unknown")
 
 # Explanation:  dispersal_high:     high dispersal capacity 
@@ -268,7 +222,7 @@ names(df_EUR)[grep(c("egg.1|lar|nym|pup|adu"), names(df_EUR))] <-
 
 
 ## Emergence period
-names(df_EUR)[grep(c("win|spr|sum|aut"), names(df_EUR))] <- 
+names(df_EUR)[grep(c("win|spr$|sum|aut"), names(df_EUR))] <- 
   c("ermerge_winter", "emerge_summer", "emerge_spring", "emerge_autumn")
 
 # Explanation:  ermerge_winter: emerging mainly in winter
@@ -290,7 +244,7 @@ names(df_EUR)[grep(c("sev|unv|biv|trv|muv|flx"), names(df_EUR))] <-
 
 
 ## Reproduction
-names(df_EUR)[grep(c("ovo|fie|cie|fic|frc|vec|tec|ase|pas"), names(df_EUR))] <- 
+names(df_EUR)[grep(c("ovo|fie|cie|fic|frc|vec|tec|ase|pas$"), names(df_EUR))] <- 
   c("rep_ovovipar", "rep_egg_free_iso", "rep_egg_cem_iso", "rep_clutch_fixed",
     "rep_clutch_free", "rep_clutch_veg", "rep_clutch_ter", "rep_asexual", "rep_parasitic")
 
@@ -303,5 +257,58 @@ names(df_EUR)[grep(c("ovo|fie|cie|fic|frc|vec|tec|ase|pas"), names(df_EUR))] <-
 #               rep_clutch_ter:   terrestrial clutches - groups of eggs are laid down in the riparian zone
 #               rep_asexual:      asexual - reproduction without fertilisation
 #               rep_parasitic:    parasitic - reproduction within a host
+
+
+#### Get taxa information
+# Two Species can not be found in the gbif database. 
+# 1. Lepidostoma doehleri is missing. Belongs to the family Lepidostoma.
+# 2. Holostomis phalaenoides is also known as Phryganea phalaenoides (https://eprints.lib.hokudai.ac.jp/dspace/bitstream/2115/22222/1/2_P1-6.pdf).
+spec_gbif <- df_EUR$Taxon[df_EUR$Taxon != "Lepidostoma doehleri" & df_EUR$Taxon != "Holostomis phalaenoides"]
+spec_nbn <- c("Lepidostoma doehleri", "Phryganea phalaenoides")
+
+# Get family and genus levels from "Global Biodiversity Information Facility" (gbif)
+tax_gbif <- get_ids(names = spec_gbif, db = "gbif")
+cl_gbif <- cbind(classification(tax_gbif$gbif, return_id = FALSE)); beep(4)
+
+# Get missing family and genus levels from "National Biodiversity Network" (nbn)
+tax_nbn <- get_ids(names = spec_nbn, db = "nbn")
+cl_nbn <- cbind(classification(tax_nbn$nbn, return_id = FALSE))
+
+# Combine all necessary taxa info (order, family, genus) into one dataframe
+class_full <- rbind(cl_gbif[4:7], cl_nbn[6:9])
+class_full <- class_full[c(1:366, 3924, 367:871, 3925, 872:3923), ]
+
+df_EUR_complete <- cbind(df_EUR, class_full)
+df_EUR_complete <- df_EUR_complete %>%
+  select(order:genus, Taxon:order)
+
+write.table(df_EUR_complete, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR.csv", sep = ",")
+
+#### Add trait size from Tachet database via table join
+tachet <- read.csv(file.path(path, "Europe", "Tachet_mod_csv.csv"), stringsAsFactors = FALSE)[, c(1:14)]
+df_EUR <- read.csv(file.path(path, "Europe", "macroinvertebrate_EUR.csv"), stringsAsFactors = FALSE)
+
+# Merge df_EUR with size information from Tachet
+EU_size <- df_EUR[, 3:4]
+
+# 1. Merge on species level
+EU_size <- merge(EU_size, tachet, by.x = "Taxon", by.y = "taxa", all.x =  TRUE)
+
+# 2. Merge on genus level
+EU_size <- merge(EU_size, tachet, by.x = "genus.x", by.y = "taxa", all.x =  TRUE)
+
+# 3. Combine size columns and add to df_EU
+EU_size <- EU_size %>%
+  transmute(size_1 = size_1.x + size_1.y,
+            size_2 = size_2.x + size_2.y,
+            size_3 = size_3.x + size_3.y,
+            size_4 = size_4.x + size_4.y,
+            size_5 = size_5.x + size_5.y,
+            size_6 = size_6.x + size_6.y,
+            size_7 = size_7.x + size_7.y)
+
+df_EUR <- cbind(df_EUR, EU_size)
+
+write.table(df_EUR, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR.csv", sep = ",")
 
 # 
