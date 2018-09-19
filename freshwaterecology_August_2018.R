@@ -11,7 +11,7 @@ filelinks = list.files(data_in, pattern = "taxadbexport", full.names = TRUE)
 output_db = replicate( length(filelinks),data.frame())
 
 for(i in seq_along(filelinks)){
-
+  
   # fetch line where actual DB starts
   ind = grep("Taxon", readLines(filelinks[i]))  
   
@@ -20,7 +20,7 @@ for(i in seq_along(filelinks)){
   
   # put into list
   output_db[[i]] = db
-
+  
 }  
 
 # bind
