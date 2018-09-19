@@ -1,3 +1,7 @@
+library(taxize)
+library(data.table)
+library(dplyr)
+
 #### Preparation: European database ####
 df_EUR <- read.csv(file.path(path, "Europe", "Freshwaterecol_Aug_2018.csv"), stringsAsFactors = FALSE)
 
@@ -13,20 +17,20 @@ spec_nbn <- c("Lepidostoma doehleri", "Phryganea phalaenoides")
 
 # Get family and genus levels from "Global Biodiversity Information Facility" (gbif)
 tax_gbif <- get_ids(names = spec_gbif, db = "gbif")
-cl_gbif <- cbind(classification(tax_gbif$gbif, return_id = FALSE)); beep(4)
+cl_gbif <- cbind(classification(tax_gbif$gbif, return_id = FALSE))#; beep(4)
 
 # Get missing family and genus levels from "National Biodiversity Network" (nbn)
 tax_nbn <- get_ids(names = spec_nbn, db = "nbn")
 cl_nbn <- cbind(classification(tax_nbn$nbn, return_id = FALSE))
 
-# Combine all necessary taxa info (order, family, genus) into one dataframe
+# Combine all necessary taxa info (order, family, genus) into one dataframe, then order
 class_full <- rbind(cl_gbif[4:7], cl_nbn[6:9])
-class_full <- class_full[c(1:448, 3532, 449:871, 3533, 872:3531), ]
+class_full <- class_full[order(class_full$order), ]
 
 df_EUR_complete <- cbind(df_EUR, class_full)
-df_EUR_complete <- df_EUR_complete %>%
-  select(order:genus, Taxon:order)
+df_EUR_complete <- df_EUR_complete %>% select(order:genus, Taxon:order)
 
+#
 write.table(df_EUR_complete, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR.csv", sep = ",")
 
 #### Add trait size from Tachet database via table join
