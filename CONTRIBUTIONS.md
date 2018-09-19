@@ -4,6 +4,7 @@
 - Fork this repo to your Github account
 - Clone your version on your account down to your machine from your account, 
   e.g,. git clone 
+  
   https://github.com/<yourgithubusername>/TraitPattern.git
 - Make sure to track progress upstream (i.e., on our version of tTraitPattern at KunzstLD/TraitPatter) by doing 
   git remote add upstream https://github.com/KunzstLD/TraitPatter.git. 
