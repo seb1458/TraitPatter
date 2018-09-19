@@ -1,6 +1,5 @@
-# TraitPatter
-Find trait patterns in macroinvertebrate trait data across different regions
-  
+# TraitPattern
+
  - Get trait data from freshwaterecology:
     
     - Scripts presented here show one way to put many csv files to one data.frame together (csv. files can be exported from
