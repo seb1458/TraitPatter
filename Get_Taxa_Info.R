@@ -2,8 +2,12 @@ library(taxize)
 library(data.table)
 library(dplyr)
 
+#
+data_in = "/home/kunz/Dokumente/Trait DB/Europe"
+
+
 #### Preparation: European database ####
-df_EUR <- read.csv(file.path(path, "Europe", "Freshwaterecol_Aug_2018.csv"), stringsAsFactors = FALSE)
+df_EUR <- read.csv(file.path(data_in, "Freshwater_info","Freshwaterecol_Aug_2018.csv"), stringsAsFactors = FALSE)
 
 row_del <- grep("[[:punct:]]", df_EUR$Taxon, ignore.case = TRUE)
 df_EUR <- df_EUR[-row_del, ]
@@ -34,8 +38,8 @@ df_EUR_complete <- df_EUR_complete %>% select(order:genus, Taxon:order)
 write.table(df_EUR_complete, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR.csv", sep = ",")
 
 #### Add trait size from Tachet database via table join
-tachet <- read.csv(file.path(path, "Europe", "Tachet_mod_csv.csv"), stringsAsFactors = FALSE)[, c(1:14)]
-df_EUR <- read.csv(file.path(path, "Europe", "macroinvertebrate_EUR.csv"), stringsAsFactors = FALSE)
+tachet <- read.csv(file.path(data_in, "Tachet_mod_csv.csv"), stringsAsFactors = FALSE)[, c(1:14)]
+df_EUR <- read.csv(file.path(data_in, "macroinvertebrate_EUR.csv"), stringsAsFactors = FALSE)
 
 # Merge df_EUR with size information from Tachet
 EU_size <- df_EUR[, 3:4]
