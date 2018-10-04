@@ -7,13 +7,13 @@ library(readxl)
 
 #---------------------------------------#
 #### Data directory ####
-data_in = "/home/kunz/Dokumente/Trait DB"
+data_in <- "/home/kunz/Dokumente/Trait DB"
 
 #---------------------------------------#
 
-# Load US DB 
-US_trait_DB = read_excel(file.path(data_in, "North America", "6138 inverttraitstable.xls"), sheet = 1)
-US_trait_DB = as.data.table(US_trait_DB)
+# Load US DB
+US_trait_DB <- read_excel(file.path(data_in, "North America", "6138 inverttraitstable.xls"), sheet = 1)
+US_trait_DB <- as.data.table(US_trait_DB)
 
 # spp. in Taxon to NA
 # all spp. taxa in Taxon column have an entry in Genus -> transform to NA
@@ -32,5 +32,3 @@ US_trait_DB[Taxon %like% ".+dae" & Taxon == Family, Taxon := NA]
 # Familienames in Taxon occur also in column Family, hence this is actually sufficient:
 # US_trait_DB[Taxon == Family, Taxon := NA]
 # check: US_trait_DB[Taxon %like% ".+dae",]
-
-
