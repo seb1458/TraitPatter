@@ -4,7 +4,7 @@
 # e.g. .fetch_dupl(dat = US_trait_DB, x = US_trait_DB[,.(Taxa)])
 .fetch_dupl = function(
   dat,
-  x  
+  x
 )
 {  
   # dat as data.frame
