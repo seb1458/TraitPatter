@@ -6,9 +6,7 @@
                         dat,
                         x) {
   # dat as data.frame
-  if (!is.data.frame(dat)) {
-    dat <- as.data.frame(dat)
-  }
+  dat <- as.data.frame(dat)
 
   # Search for duplicates
   n_occur <- data.frame(table(x))
