@@ -6,7 +6,7 @@
                         dat,
                         x) {
   # dat as data.frame
-  if (is.data.table(dat)) {
+  if (!is.data.frame(dat)) {
     dat <- as.data.frame(dat)
   }
 
