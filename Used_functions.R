@@ -20,3 +20,23 @@
   output <- output[order(output[, c(col)]), ]
   return(output)
 }
+
+#### Aggregate duplicate taxa entries ####
+# x can look like trait_test[, c("Feed_mode_prim", "Feed_mode_sec", "Habit_prim")] 
+# index like taxa_test[, "Taxa"]
+.agg_dupl <- function(x, index) {
+    # Conversion prohibitet by I()
+    # -> otherwise char vec. would be represented as their factor levels
+    aggregate(I(x),
+        by = list(index),
+        function(y) {
+            y <- y[!is.na(y)]
+            if (!length(y)) {
+                y <- NA
+            }
+            y <- y[!duplicated(y)]
+            y <- sample(y, 1)
+            return(y)
+        }
+    )
+}
