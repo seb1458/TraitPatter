@@ -9,6 +9,9 @@ library(readxl)
 #### Data directory ####
 data_in <- "/home/kunz/Dokumente/Trait DB"
 
+# Location of loaded scripts
+data_scripts <- "/home/kunz/Dokumente/Scripts/TP_stage1"
+
 #---------------------------------------#
 
 #### Used scripts ####
