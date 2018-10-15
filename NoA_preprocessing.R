@@ -11,6 +11,12 @@ data_in <- "/home/kunz/Dokumente/Trait DB"
 
 #---------------------------------------#
 
+#### Used scripts ####
+# Load functions script
+source(file = file.path(data_scripts, "Used_functions_NoGH.R"))
+
+#---------------------------------------#
+
 # Load US DB
 US_trait_DB <- read_excel(file.path(data_in, "North America", "6138 inverttraitstable.xls"), sheet = 1)
 US_trait_DB <- as.data.table(US_trait_DB)
