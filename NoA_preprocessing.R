@@ -10,7 +10,7 @@ library(readxl)
 data_in <- "/home/kunz/Dokumente/Trait DB"
 
 # Location of loaded scripts
-data_scripts <- "/home/kunz/Dokumente/Scripts/TP_stage1"
+data_scripts <- "/home/kunz/Dokumente/Trait DB/Scripts_TP_stage1"
 
 #---------------------------------------#
 
@@ -62,6 +62,17 @@ US_trait_DB[, c(search_col) := NULL]
 # fetch duplicated taxa
 US_dupl <- .fetch_dupl(dat = US_trait_DB, x = US_trait_DB[, .(Taxa)])
 
+
+# Get "conflict" data (multiple different entries for the same species)
+# NoA_conflict <- as.data.table(US_dupl)
+# 
+# NoA_conflict <- NoA_conflict[, lapply(.SD, function(y) {
+#   y <- y[!is.na(y)]
+#   y <- y[!duplicated(y)]
+#   y[length(y) > 1]
+# }), by = Taxa, .SDcols = names(NoA_conflict)]
+
+
 # Split up in taxa & trait data
 US_dupl_taxa <- US_dupl[, c("Taxa", "Genus", "Family", "Taxon")]
 US_dupl_trait <- US_dupl[, -grep("Taxa|Genus|Family|Taxon", names(US_dupl),
@@ -99,9 +110,9 @@ US_dupl <- cbind(US_dupl_taxa, US_dupl_agg[, -1], US_dupl_measured[, -1])
 # Bring together with US_trait_DB
 US_trait_DB <- rbind(US_trait_DB[!Taxa %in% US_dupl_taxa$Taxa], US_dupl)
 # ? Actually better doing all this with data.table, preserving all the information
-
 # Check outcome -> looks good!
 # .fetch_dupl(dat = US_trait_DB, x = US_trait_DB[,.(Taxa)])
+
 
 # Order according to Taxa column 
 setorder(US_trait_DB, Taxa)
