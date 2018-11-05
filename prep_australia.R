@@ -38,7 +38,50 @@ names_AUS <- names_AUS %>%
   mutate(Order = ifelse(Order == "NA", Order_bugs_gbr, Order),
          Order = ifelse(Order =="NA", Order_fam_Chessman2017, Order))
 
-# Correct entries for order column
+# 3. Delete unnecessary information
+names_AUS <- names_AUS %>% 
+  select(-SAName_botwe, -Order_bugs_gbr, -Order_fam_Chessman2017)
+
+# # Delete all unnecessary taxa information
+# fin_AUS <- cbind(names_AUS, df_AUS[, 5:ncol(df_AUS)])
+# fin_AUS <- fin_AUS %>%
+#   select(-Genus, -Subfamily, -SAName_botwe, -Order_fam_Chessman2017, -name_in_Schafer, -Phylum_bugs_gbr, -Class_bugs_gbr,
+#          -Order_bugs_gbr, -`Sub-family_bugs_gbr`, -`Sub-order_bugs_gbr`, -Class_or_subClass, -Phylum, -Group_or_subPhylum,
+#          -TrueFamily) %>%
+#   rename(Genus = genus)
+
+
+# --- Table Join with the ID list from Ben Kefford
+id_sheet1 <- read_excel(file.path(path, "Australia", "VicEPA_Codes.xlsx"), sheet = 1)
+id_sheet1 <- id_sheet1 %>%
+  select(X__1, CLASS, ORDER, FAMILY, SPECIES) %>%
+  rename(ID = X__1, Class = CLASS, Order = ORDER, Family = FAMILY, Species = SPECIES, Comments = X__3)
+
+id_sheet2 <- read_excel(file.path(path, "Australia", "VicEPA_Codes.xlsx"), sheet = 2)
+id_sheet2 <- id_sheet2 %>%
+  select(Code:SPECIES) %>%
+  rename(ID = Code, Class = CLASS, Order = ORDER, Family = FAMILY, Species = SPECIES)
+
+
+id_sheet3 <- read_excel(file.path(path, "Australia", "VicEPA_Codes.xlsx"), sheet = 3)
+id_sheet3 <- id_sheet3 %>%
+  select(Code:SPECIES) %>%
+  rename(ID = Code, Class = CLASS, Order = ORDER, Family = FAMILY, Species = SPECIES)
+
+
+id_list <- rbind(id_sheet1, id_sheet2, id_sheet3) %>%
+  rename(long_code = ID)
+
+names_AUS <- merge(x = names_AUS, y = id_list, by = "long_code")
+
+names_AUS <- names_AUS %>%
+  mutate(Order = Order.x,
+         Family = Family.x) %>%
+  mutate(Order = ifelse(Order == "NA", Order.y, Order),
+         Family = ifelse(Family == "NA", Family.y, Family))
+
+
+# --- Correct entries for order column
 levels(as.factor(names_AUS$Order))
 
 names_AUS <- names_AUS %>%
@@ -49,37 +92,6 @@ names_AUS <- names_AUS %>%
          Order = ifelse(Order == "Super Order Syncarida", Order_fam_Chessman2017, Order)) %>%
   select(-SAName_botwe, -Order_bugs_gbr, -Order_fam_Chessman2017) %>%
   rename(genus = Genus)
-
-fin_AUS <- cbind(names_AUS, df_AUS[, 5:ncol(df_AUS)])
-fin_AUS <- fin_AUS %>%
-  select(-Genus, -Subfamily, -SAName_botwe, -Order_fam_Chessman2017, -name_in_Schafer, -Phylum_bugs_gbr, -Class_bugs_gbr,
-         -Order_bugs_gbr, -`Sub-family_bugs_gbr`, -`Sub-order_bugs_gbr`, -Class_or_subClass, -Phylum, -Group_or_subPhylum,
-         -TrueFamily) %>%
-  rename(Genus = genus)
-
-
-# Collect missing order and genus information
-#
-#
-#
-
-
-
-# Seperate genus from the other taxon entries
-# sp <- grep("sp\\.|spp\\.", names_AUS$Genus_and_species[tax_miss], ignore.case = TRUE)
-# 
-# names_AUS$Genus_and_species[sp]
-
-# df_AUS$genus_new <- rep(NA, nrow(df_AUS))
-# df_AUS$genus_new[sp] <- word(df_AUS$Genus_and_species[sp], 1)
-
-# df_AUS$genus_new <- ifelse(df_AUS$level == "Genus", word(df_AUS$Taxon_lowest_ID, 1), df_AUS$genus_new)
-# 
-# # Entries ending with "-idae" are used as family names
-# fam <- grep("idae", df_AUS$genus_new, ignore.case = TRUE)
-# df_AUS$Family[fam] <- df_AUS$genus_new[fam]
-# df_AUS$genus_new[fam] <- NA
-
 
 
 #### Query traits to keep ####
@@ -149,7 +161,6 @@ df_AUS <- df_AUS %>%
 
 
 #### Format trait information ####
-fin_AUS <- df_AUS
 
 # ---- Voltinism ---- #
 # Explanation
@@ -637,7 +648,15 @@ life <- life %>%
 # Shafer and GBR with specific size in mm
 
 
-# Combine all traits with names_AUS
+# ---- Aquatic Stages ---- #
+# Only VicEPA with data on aquatic stages of taxa
+
+
+# NOTE: Information about emergence flight, resistance form, saprobity and dissemination strategy
+# are not included in any database!
+
+
+#### Combine all traits with names_AUS ####
 df_AUS_complete <- cbind(names_AUS, voltinism, reproduction, feeding, respiration, drift,
                          substrate, salinity, ph, temperature, life)
 write.table(df_AUS_complete, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_AUS.csv", sep = ",")
