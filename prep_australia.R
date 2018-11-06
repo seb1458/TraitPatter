@@ -52,21 +52,22 @@ names_AUS <- names_AUS %>%
 
 
 # --- Table Join with the ID list from Ben Kefford
+# NOTE: The file containing the codes has some format errors for some cells. Remove manually in spreadsheet.
 id_sheet1 <- read_excel(file.path(path, "Australia", "VicEPA_Codes.xlsx"), sheet = 1)
 id_sheet1 <- id_sheet1 %>%
-  select(X__1, CLASS, ORDER, FAMILY, SPECIES) %>%
-  rename(ID = X__1, Class = CLASS, Order = ORDER, Family = FAMILY, Species = SPECIES, Comments = X__3)
+  select(-PHYLUM, -CLASS, -X__2, -X__3) %>%
+  rename(ID = X__1, Order = ORDER, Family = FAMILY, Species = SPECIES)
 
 id_sheet2 <- read_excel(file.path(path, "Australia", "VicEPA_Codes.xlsx"), sheet = 2)
 id_sheet2 <- id_sheet2 %>%
-  select(Code:SPECIES) %>%
-  rename(ID = Code, Class = CLASS, Order = ORDER, Family = FAMILY, Species = SPECIES)
+  select(-CLASS, -Comments) %>%
+  rename(ID = Code, Order = ORDER, Family = FAMILY, Species = SPECIES)
 
 
 id_sheet3 <- read_excel(file.path(path, "Australia", "VicEPA_Codes.xlsx"), sheet = 3)
 id_sheet3 <- id_sheet3 %>%
-  select(Code:SPECIES) %>%
-  rename(ID = Code, Class = CLASS, Order = ORDER, Family = FAMILY, Species = SPECIES)
+  select(-CLASS, -Comments) %>%
+  rename(ID = Code, Order = ORDER, Family = FAMILY, Species = SPECIES)
 
 
 id_list <- rbind(id_sheet1, id_sheet2, id_sheet3) %>%
@@ -78,20 +79,119 @@ names_AUS <- names_AUS %>%
   mutate(Order = Order.x,
          Family = Family.x) %>%
   mutate(Order = ifelse(Order == "NA", Order.y, Order),
-         Family = ifelse(Family == "NA", Family.y, Family))
+         Family = ifelse(Family == "NA", Family.y, Family)) %>%
+  select(-Order.x, -Order.y, -Family.x, -Family.y)
 
+# Some duplicates of family names with NAs for Order
+# 1. Get all order and family names where Order is not NA
+order_compl <- names_AUS[!is.na(names_AUS$Order), 5:6] %>%
+  unique()
 
-# --- Correct entries for order column
-levels(as.factor(names_AUS$Order))
+# 2. Dismiss all rows with NA as family entry
+order_compl <- order_compl[!is.na(order_compl$Family), ]
+
+# 3. Table join to complete entries
+names_AUS <- merge(x = names_AUS, y = order_compl, by = "Family")
+names_AUS <- names_AUS %>%
+  rename(Order = Order.y) %>%
+  select(-Order.x) %>% 
+  select(long_code, Order, Family, Genus, Genus_and_species, Species)
+
+# Remove rows containing only NAs
+names_AUS <- names_AUS[complete.cases(names_AUS), ]
+
+# --- Correct entries for Family column
+levels(as.factor(names_AUS$Family))
 
 names_AUS <- names_AUS %>%
-  mutate(Order = ifelse(Order == "N/A", "NA", Order),
-         Order = ifelse(Order == "NULL", "NA", Order),
-         Order = ifelse(Order == "Diplostraca - Cladocera", "Cladocera", Order),
-         Order = ifelse(Order == "Diplostraca - Conchostraca", "Conchostraca", Order),
-         Order = ifelse(Order == "Super Order Syncarida", Order_fam_Chessman2017, Order)) %>%
-  select(-SAName_botwe, -Order_bugs_gbr, -Order_fam_Chessman2017) %>%
-  rename(genus = Genus)
+  mutate(Family = ifelse(Family == "Anisoptera (dragonflies)", NA, Family),
+         Family = ifelse(Family == "Arrenuridae (water mite)", "Arrenuridae", Family),
+         Family = ifelse(Family == "Aturidae (water mites)", "Aturidae", Family),
+         Family = ifelse(Family == "Chironomidae: Aphroteniinae" |
+                           Family == "Chironomidae: Chironominae" |
+                           Family == "Chironomidae: Orthocladiinae" |
+                           Family == "Chironomidae: Podonominae" |
+                           Family == "Chironomidae: Tanypodinae",
+                         "Chironomidae", Family),
+         Family = ifelse(Family == "Coenagrionidae (odonata)", "Coenagrionidae", Family),
+         Family = ifelse(Family == "Conoesucidae (Tricoptera)", "Conoesucidae", Family),
+         Family = ifelse(Family == "Gripopterygidae (Plecoptera)", "Gripopterygidae", Family))
+
+
+# --- Correct entries which are not a family name
+names_AUS[!grepl("idae", names_AUS$Family), 2:6]
+
+# Acarina is a subclass name. Acariformes is the super order name
+# Acariformes has following orders: Sarcoptiformes, Trombidiformes, Oribatida, Mesostigmata
+
+# 1. Halacaroidea: super family name
+# Order: Trombidiformes
+
+# 2. Hydracarina: super family name
+# Order: Trombidiformes
+
+# 3. Mesostigmata: order name
+names_AUS[names_AUS$Species == "Mesostigmata (Unident.)", 2] <- "Mesostigmata"
+
+# 4. Trombidioidea: super family name
+# Order: Trombidiformes
+
+# 5. Astigmata: cohort name
+# Order: Sarcoptiformes
+
+# 6. Oribatida: order name 
+names_AUS[names_AUS$Species == "Oribatida (Unident.)", 2] <- "Oribatida"
+
+# Species belonging to Sarcoptiformes
+names_AUS[names_AUS$Family == "Anisitsiellidae" |
+            names_AUS$Family == "Hydrozetidae" |
+            names_AUS$Species == "Astigmata (Unident.)", 2] <- "Sarcoptiformes"
+
+# Species belonging to Trombidiformes
+names_AUS[names_AUS$Family == "Anisitsiellidae" |
+            names_AUS$Family == "Arrenuridae" |
+            names_AUS$Family == "Astacocrotonidae" |
+            names_AUS$Family == "Aturidae" |
+            names_AUS$Family == "Eylaidae" |
+            names_AUS$Family == "Halacaridae " |
+            names_AUS$Family == "Hydrachnidae" |
+            names_AUS$Family == "Hydrodromidae" |
+            names_AUS$Family == "Hydryphantidae" |
+            names_AUS$Family == "Hygrobatidae" |
+            names_AUS$Family == "Johnstonianidae" |
+            names_AUS$Family == "Limnesiidae" |
+            names_AUS$Family == "Limnocharidae" |
+            names_AUS$Family == "Mideopsidae" |
+            names_AUS$Family == "Momoniidae" |
+            names_AUS$Family == "Oxidae" |
+            names_AUS$Family == "Pezidae" |
+            names_AUS$Family == "Pionidae" |
+            names_AUS$Family == "Torrenticolidae" |
+            names_AUS$Family == "Unionicolidae" |
+            names_AUS$Family == "Zelandothyadidae" |
+            names_AUS$Species == "Trombidioidea (Unident.)" |
+            names_AUS$Species == "Halacaroidea (Unident.)" |
+            names_AUS$Species == "Hydracarina (Unident.)", 2] <- "Trombidiformes"
+
+# Rest of the family entries withou the ending "-idae" are changed to NA
+names_AUS[!grepl("idae", names_AUS$Family), 3] <- NA
+
+# Remove rows containing only NAs
+names_AUS <- names_AUS[complete.cases(names_AUS), ]
+
+
+# --- Correct entries for Order column
+levels(as.factor(names_AUS$Order))
+
+# Super Order Syncarida contains two families: Koonungidae (Order: Anaspidacea) and Parabathynellidae (Order: Bathynellacea)
+names_AUS[grepl("Super", names_AUS$Order), 2:6]
+
+names_AUS[names_AUS$Family == "Koonungidae", 2] <- "Anaspidacea"
+names_AUS[names_AUS$Family == "Parabathynellidae", 2] <- "Bathynellacea"
+
+
+# --- Edit Genus and Species columns
+head(names_AUS, 15)
 
 
 #### Query traits to keep ####
