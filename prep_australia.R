@@ -11,6 +11,7 @@ path <- "~/Schreibtisch/Thesis/data"
 library(tidyverse)
 library(readxl)
 library(reshape2)
+library(naniar)
 
 library(taxize)
 library(stringr)
@@ -20,6 +21,9 @@ library(beepr)
 
 #### Load data ####
 df_AUS <- read_excel(file.path(path, "Australia", "Australian macroinv trait database.xlsx"))
+
+# Replace all character NAs with real NAs (package naniar)
+df_AUS <- df_AUS %>% replace_with_na_all(condition = ~.x %in% c("NA", "N/A", "NULL"))
 
 
 
@@ -31,24 +35,36 @@ names_AUS <- df_AUS[, c("Order", "Family", "Genus", "Genus_and_species", "long_c
 # Combine columns: 
 # 1. Genus_and_species + SAName_botwe
 names_AUS <- names_AUS %>%
-  mutate(Genus_and_species = ifelse(Genus_and_species == "NA", SAName_botwe, Genus_and_species))
+  mutate(Genus_and_species = if_else(is.na(Genus_and_species), SAName_botwe, Genus_and_species))
 
 # 2. Order + Order_bugs_gbr + Order_fam_Chessman2017
 names_AUS <- names_AUS %>%
-  mutate(Order = ifelse(Order == "NA", Order_bugs_gbr, Order),
-         Order = ifelse(Order =="NA", Order_fam_Chessman2017, Order))
+  mutate(Order = if_else(is.na(Order), Order_bugs_gbr, Order),
+         Order = if_else(is.na(Order), Order_fam_Chessman2017, Order))
 
 # 3. Delete unnecessary information
 names_AUS <- names_AUS %>% 
-  select(-SAName_botwe, -Order_bugs_gbr, -Order_fam_Chessman2017)
+  select(-SAName_botwe, -Order_bugs_gbr, -Order_fam_Chessman2017) %>%
+  rename(Order.x = Order, Family.x = Family, Genus.x = Genus, Genus_and_species.x = Genus_and_species)
 
-# # Delete all unnecessary taxa information
-# fin_AUS <- cbind(names_AUS, df_AUS[, 5:ncol(df_AUS)])
-# fin_AUS <- fin_AUS %>%
-#   select(-Genus, -Subfamily, -SAName_botwe, -Order_fam_Chessman2017, -name_in_Schafer, -Phylum_bugs_gbr, -Class_bugs_gbr,
-#          -Order_bugs_gbr, -`Sub-family_bugs_gbr`, -`Sub-order_bugs_gbr`, -Class_or_subClass, -Phylum, -Group_or_subPhylum,
-#          -TrueFamily) %>%
-#   rename(Genus = genus)
+# 4. Some entries with NAs in taxon columns and long_code -> No identification possible
+names_AUS[is.na(names_AUS$long_code) & is.na(names_AUS$Family.x), ]
+
+names_AUS <- names_AUS[rowSums(is.na(names_AUS[2:5])) != ncol(names_AUS[2:5]), ]
+
+# 5. Strange code data: MITEXXXX dismissed for now
+names_AUS <- names_AUS[!grepl("mite", names_AUS$long_code, ignore.case = TRUE), ]
+
+# 6. Find and remove duplicated entries in names_AUS$long_code
+names_AUS %>% 
+  group_by(long_code) %>% 
+  filter(n() > 1) %>%
+  arrange(long_code)
+
+names_AUS_code_na <- names_AUS[is.na(names_AUS$long_code), ]
+names_AUS <- names_AUS[!duplicated(names_AUS$long_code) & !is.na(names_AUS$long_code),]
+
+names_AUS <- rbind(names_AUS, names_AUS_code_na)
 
 
 # --- Table Join with the ID list from Ben Kefford
@@ -63,7 +79,6 @@ id_sheet2 <- id_sheet2 %>%
   select(-CLASS, -Comments) %>%
   rename(ID = Code, Order = ORDER, Family = FAMILY, Species = SPECIES)
 
-
 id_sheet3 <- read_excel(file.path(path, "Australia", "VicEPA_Codes.xlsx"), sheet = 3)
 id_sheet3 <- id_sheet3 %>%
   select(-CLASS, -Comments) %>%
@@ -71,15 +86,26 @@ id_sheet3 <- id_sheet3 %>%
 
 
 id_list <- rbind(id_sheet1, id_sheet2, id_sheet3) %>%
-  rename(long_code = ID)
+  rename(long_code = ID, Order.y = Order, Family.y = Family, Species.y = Species)
 
-names_AUS <- merge(x = names_AUS, y = id_list, by = "long_code")
+# Remove duplicated entries from id_list
+id_list <- id_list[!duplicated(id_list$long_code), ]
+
+
+# Some codes are in names_AUS but not in id_list as well as missing entries for names_AUS$long_code
+setdiff(names_AUS$long_code, id_list$long_code)
+
+sum(is.na(names_AUS$long_code))
+
+
+# Use left table join to extend the names_AUS data
+names_AUS <- merge(x = names_AUS, y = id_list, by = "long_code", all.x = TRUE)
 
 names_AUS <- names_AUS %>%
   mutate(Order = Order.x,
          Family = Family.x) %>%
-  mutate(Order = ifelse(Order == "NA", Order.y, Order),
-         Family = ifelse(Family == "NA", Family.y, Family)) %>%
+  mutate(Order = ifelse(is.na(Order), Order.y, Order),
+         Family = ifelse(is.na(Family), Family.y, Family)) %>%
   select(-Order.x, -Order.y, -Family.x, -Family.y)
 
 # Some duplicates of family names with NAs for Order
@@ -87,18 +113,19 @@ names_AUS <- names_AUS %>%
 order_compl <- names_AUS[!is.na(names_AUS$Order), 5:6] %>%
   unique()
 
-# 2. Dismiss all rows with NA as family entry
+# 2. Dismiss all rows with NA as family entry and all duplicates
 order_compl <- order_compl[!is.na(order_compl$Family), ]
+order_compl <- order_compl[!duplicated(order_compl$Family), ]
 
 # 3. Table join to complete entries
-names_AUS <- merge(x = names_AUS, y = order_compl, by = "Family")
+names_AUS <- merge(x = names_AUS, y = order_compl, by = "Family", all.x = TRUE) 
+
+# Order.x = old Order names, Order.y = complete Order names
 names_AUS <- names_AUS %>%
-  rename(Order = Order.y) %>%
+  rename(Order = Order.y, Genus = Genus.x, Genus_and_species = Genus_and_species.x, Species = Species.y) %>%
   select(-Order.x) %>% 
   select(long_code, Order, Family, Genus, Genus_and_species, Species)
 
-# Remove rows containing only NAs
-names_AUS <- names_AUS[complete.cases(names_AUS), ]
 
 # --- Correct entries for Family column
 levels(as.factor(names_AUS$Family))
@@ -119,7 +146,9 @@ names_AUS <- names_AUS %>%
 
 
 # --- Correct entries which are not a family name
+names_AUS <- names_AUS[rowSums(is.na(names_AUS[2:6])) != ncol(names_AUS[2:6]), ]
 names_AUS[!grepl("idae", names_AUS$Family), 2:6]
+levels(as.factor(names_AUS[!grepl("idae", names_AUS$Family), 3]))
 
 # Acarina is a subclass name. Acariformes is the super order name
 # Acariformes has following orders: Sarcoptiformes, Trombidiformes, Oribatida, Mesostigmata
@@ -173,11 +202,33 @@ names_AUS[names_AUS$Family == "Anisitsiellidae" |
             names_AUS$Species == "Halacaroidea (Unident.)" |
             names_AUS$Species == "Hydracarina (Unident.)", 2] <- "Trombidiformes"
 
+# Family Brachyura actually belonging to Order Decapoda
+names_AUS[names_AUS$Family == "Brachyura", ] <- Decapoda
+
+# Gastropoda !!!
+names_AUS[]
+
+# Nematoda !!!
+names_AUS[]
+
+# Nemertea !!!
+names_AUS[]
+
+# Pelecypoda !!! -> Bivalvia
+names_AUS[]
+
+# Check NAs !!!
+names_AUS[]
+
 # Rest of the family entries withou the ending "-idae" are changed to NA
 names_AUS[!grepl("idae", names_AUS$Family), 3] <- NA
 
 # Remove rows containing only NAs
 names_AUS <- names_AUS[complete.cases(names_AUS), ]
+
+# Sort by long_code, Order, Family
+names_AUS <- names_AUS %>%
+  arrange(long_code, Order, Family)
 
 
 # --- Correct entries for Order column
@@ -250,7 +301,7 @@ keep_maxwell <- c(grep("EC|repro|resp|volt|disp|C_Maxwell|P_Maxwell|SH|C,SH|SC|P
 # Keep: Salinity preference, reproduction, respiration, voltinism, dispersal, feeding group
 
 # Final columns to keep
-df_AUS <- df_AUS %>%
+fin_AUS <- names_AUS %>%
   select(keep_shafer,
          keep_gbr,
          keep_vicepa,
