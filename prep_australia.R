@@ -21,10 +21,8 @@ library(beepr)
 #### Load data ####
 df_AUS <- read_excel(file.path(path, "Australia", "Australian macroinv trait database.xlsx"), sheet = 1)
 
-# Replace all character NAs with real NAs
-df_AUS[df_AUS == "N/A"] <- NA
-df_AUS[df_AUS == "NULL"] <- NA
-df_AUS[df_AUS == "NA"] <- NA
+# Add ID for later join
+df_AUS$id_join <- 1:nrow(df_AUS)
 
 
 
@@ -32,44 +30,19 @@ df_AUS[df_AUS == "NA"] <- NA
 #### Query taxon information ####
 
 # --- Get all columns with taxon information
-names_AUS <- df_AUS[, c("Order", "Family", "Genus", "Genus_and_species", "long_code", "Order_bugs_gbr", "SAName_botwe", "Order_fam_Chessman2017")]
+names_AUS <- df_AUS[, c("id_join", "Order", "Family", "Genus", "Genus_and_species", "long_code", "Order_bugs_gbr", "SAName_botwe", "Order_fam_Chessman2017")]
+
 
 # --- Order + Order_bugs_gbr + Order_fam_Chessman2017
 names_AUS <- names_AUS %>%
-  mutate(Order = if_else(is.na(Order), Order_bugs_gbr, Order),
-         Order = if_else(is.na(Order), Order_fam_Chessman2017, Order)) %>%
+  mutate(Order = if_else(Order == "NA", Order_bugs_gbr, Order),
+         Order = if_else(Order == "NA", Order_fam_Chessman2017, Order)) %>%
   select(-Order_bugs_gbr, -Order_fam_Chessman2017)
 
 # --- Genus_and_species + SAName_botwe
 names_AUS <- names_AUS %>%
-  mutate(Genus_and_species = if_else(is.na(Genus_and_species), SAName_botwe, Genus_and_species)) %>%
+  mutate(Genus_and_species = if_else(Genus_and_species == "NA", SAName_botwe, Genus_and_species)) %>%
   select(-SAName_botwe)
-  
-# --- Some entries with NAs in taxon columns and long_code. Also only Order name not sufficient for analysis
-# Delete this entries
-names_AUS <- names_AUS[rowSums(is.na(names_AUS[2:5])) != ncol(names_AUS[2:5]), ]
-
-# Still rows with all NAs left. Don't know why ...
-names_AUS[names_AUS$long_code == "IB010199", ]
-
-# --- Strange code data: MITEXXXX dismissed for now
-# names_AUS <- names_AUS[!grepl("mite", names_AUS$long_code, ignore.case = TRUE), ]
-
-# --- Find and remove duplicated entries in names_AUS$long_code
-names_AUS %>% 
-  group_by(long_code) %>% 
-  filter(n() > 1) %>%
-  arrange(long_code)
-
-# Seperate entries with NAs in long_code from rest
-names_AUS_code_na <- names_AUS[is.na(names_AUS$long_code), ]
-
-# Select only entries without duplicate entries and also all non-NAs in long_code
-names_AUS <- names_AUS[!duplicated(names_AUS$long_code) & !is.na(names_AUS$long_code),]
-
-# But non-duplicates and NAs back together
-names_AUS <- rbind(names_AUS, names_AUS_code_na)
-rm(names_AUS_code_na)
 
 
 
@@ -95,7 +68,7 @@ id_sheet3 <- id_sheet3 %>%
 id_list <- rbind(id_sheet1, id_sheet2, id_sheet3) %>%
   rename(long_code = ID, Order.vic = Order, Family.vic = Family, Species.vic = Species)
 
-remove(id_sheet1, id_sheet2, id_sheet3)
+rm(id_sheet1, id_sheet2, id_sheet3)
 
 # Remove duplicated entries from id_list
 id_list <- id_list[!duplicated(id_list$long_code), ]
@@ -109,18 +82,52 @@ names_AUS <- merge(x = names_AUS, y = id_list, by = "long_code", all.x = TRUE)
 
 # Combine information from both tables in new columns. Delete old columns
 names_AUS <- names_AUS %>%
-  mutate(Order = ifelse(is.na(Order), Order.vic, Order),
-         Family = ifelse(is.na(Family), Family.vic, Family)) %>%
+  mutate(Order = ifelse(Order == "NA", Order.vic, Order),
+         Family = ifelse(Family == "NA", Family.vic, Family)) %>%
   select(-Order.vic, -Family.vic) %>%
   rename(Species = Species.vic)
 
+
+ 
+#### Final Preparation of Taxa Information ####
+
+# --- Delete incomplete information
+# When NA in Family and long_code: no identification possible
+names_AUS <- names_AUS %>%
+  filter(!(Family == "NA" & long_code == "NA"))
+
+# --- Strange code data: MITEXXXX dismissed for now
+# names_AUS <- names_AUS[!grepl("mite", names_AUS$long_code, ignore.case = TRUE), ]
+
+# --- Find and remove duplicated entries in names_AUS$long_code
+test <- names_AUS %>% 
+  group_by(long_code) %>% 
+  filter(n() > 1) %>%
+  arrange(desc(long_code))
+
+# Seperate entries with NAs in long_code from rest
+names_AUS_code_na <- names_AUS[names_AUS$long_code == "NA", ]
+
+# Select only entries without duplicate entries in long_code
+names_AUS <- names_AUS[!duplicated(names_AUS$long_code) & names_AUS$long_code != "NA", ]
+
+# But non-duplicates and NAs back together
+names_AUS <- rbind(names_AUS, names_AUS_code_na)
+rm(names_AUS_code_na)
+
+# --- Replace "false" missing values
+names_AUS[names_AUS == "N/A"] <- NA
+names_AUS[names_AUS == "NULL"] <- NA
+names_AUS[names_AUS == "NA"] <- NA
+
+names_AUS <- names_AUS[!(rowSums(is.na(names_AUS[3:7])) == ncol(names_AUS[3:7])), ] 
 
 
 #### Complement Information ####
 
 # --- Some entries with missing Order but with information in Family column. 
 # 1. Get all order and family names where Order is not NA
-order_compl <- names_AUS[!is.na(names_AUS$Order), 2:3] %>%
+order_compl <- names_AUS[!is.na(names_AUS$Order), 3:4] %>%
   unique()
 
 # 2. Dismiss all rows with NA as family entry and all duplicates
@@ -133,7 +140,7 @@ names_AUS <- merge(x = names_AUS, y = order_compl, by = "Family", all.x = TRUE)
 # Order.x = old Order names, Order.y = complete Order names
 names_AUS <- names_AUS %>%
   rename(Order = Order.y) %>%
-  select(long_code, Order, Family, Genus, Genus_and_species, Species)
+  select(long_code, id_join, Order, Family, Genus, Genus_and_species, Species)
 
 
 # --- Correct entries for Family column
@@ -156,8 +163,8 @@ names_AUS <- names_AUS %>%
 
 
 # --- Correct entries which are not a family name
-names_AUS[!grepl("idae", names_AUS$Family), 2:6]
-levels(as.factor(names_AUS[!grepl("idae", names_AUS$Family), 3]))
+names_AUS[!grepl("idae", names_AUS$Family), 3:7]
+levels(as.factor(names_AUS[!grepl("idae", names_AUS$Family), 4]))
 names_AUS[is.na(names_AUS)] <- "NA"
 
 # Acarina is a subclass name. Acariformes is the super order name
@@ -170,7 +177,7 @@ names_AUS[is.na(names_AUS)] <- "NA"
 # Order: Trombidiformes
 
 # 3. Mesostigmata: order name
-names_AUS[names_AUS$Species == "Mesostigmata (Unident.)", 2] <- "Mesostigmata"
+names_AUS[names_AUS$Species == "Mesostigmata (Unident.)", 3] <- "Mesostigmata"
 
 # 4. Trombidioidea: super family name
 # Order: Trombidiformes
@@ -179,11 +186,11 @@ names_AUS[names_AUS$Species == "Mesostigmata (Unident.)", 2] <- "Mesostigmata"
 # Order: Sarcoptiformes
 
 # 6. Oribatida: order name 
-names_AUS[names_AUS$Species == "Oribatida (Unident.)", 2] <- "Oribatida"
+names_AUS[names_AUS$Species == "Oribatida (Unident.)", 3] <- "Oribatida"
 
 # Species belonging to Sarcoptiformes
 names_AUS[names_AUS$Family == "Hydrozetidae" |
-            names_AUS$Species == "Astigmata (Unident.)", 2] <- "Sarcoptiformes"
+            names_AUS$Species == "Astigmata (Unident.)", 3] <- "Sarcoptiformes"
 
 # Species belonging to Trombidiformes
 names_AUS[names_AUS$Family == "Anisitsiellidae" |
@@ -209,50 +216,148 @@ names_AUS[names_AUS$Family == "Anisitsiellidae" |
             names_AUS$Family == "Zelandothyadidae" |
             names_AUS$Species == "Trombidioidea (Unident.)" |
             names_AUS$Species == "Halacaroidea (Unident.)" |
-            names_AUS$Species == "Hydracarina (Unident.)", 2] <- "Trombidiformes"
+            names_AUS$Species == "Hydracarina (Unident.)", 3] <- "Trombidiformes"
 
-# Family Brachyura actually belonging to Order Decapoda
-names_AUS[names_AUS$Family == "Brachyura", 2] <- "Decapoda"
-names_AUS[names_AUS$Family == "Brachyura", 3] <- "NA"
 
-# Gastropoda !!!
-names_AUS[]
+# Amphipoda is the Order
+# Entry for order already existing
 
-# Nematoda !!!
-names_AUS[]
 
-# Nemertea !!!
-names_AUS[]
+# Brachyura is an Infraorder. Actual Order is Decapoda
+names_AUS[names_AUS$Family == "Brachyura", 3] <- "Decapoda"
 
-# Pelecypoda !!! -> Bivalvia
-names_AUS[]
 
-# Check NAs !!!
-names_AUS[]
+# Caridea is an Infraorder. Actual Order is Decapoda
+# Entry for order already existing
+
+
+# Coleoptera is an Order. 
+# Entry for order already existing
+
+
+# Conchostraca is a class (?)
+# Delete?
+
+
+# Decapoda is an Order
+names_AUS[names_AUS$Family == "Decapoda", 3] <- "Decapoda"
+
+
+# Diptera is an Order
+# Entry for order already existing
+
+
+# Gastropoda is a Class. Identification via species names if existing
+# 1. Bembicium is a Genus, Order is Littorinimorpha
+names_AUS[names_AUS$Genus_and_species == "Bembicium", 5] <- "Bembicium"
+names_AUS[names_AUS$Genus_and_species == "Bembicium", 3] <- "Littorinimorpha"
+names_AUS[names_AUS$Genus_and_species == "Bembicium", 6] <- "NA"
+
+# 2. Whelk is used for many different species. No clear identification
+
+# 3. Turban-shell belongs to the Turbinidae (turban snails) (?). No order found
+names_AUS[names_AUS$Genus_and_species == "Turban-shell", 5] <- "Turbo"
+names_AUS[names_AUS$Genus_and_species == "Turban-shell", 4] <- "Turbinidae"
+names_AUS[names_AUS$Genus_and_species == "Turban-shell", 6] <- "NA"
+
+# 4. Conuber belongs to the Turbinidae (turban snails) (?). No order found
+names_AUS[names_AUS$Genus_and_species == "Conuber spp.", 5] <- "Conuber"
+names_AUS[names_AUS$Genus_and_species == "Turban-shell", 4] <- "Naticidae"
+
+# 5. Gastropoda sp. not clearly identifiable
+
+
+# Hemiptera is an Order
+# Entry for Order already existing
+
+
+# Isopoda is an Order. 
+# Entry for Order already existing
+
+
+# Lepidoptera is an Order
+# Entry for Order already existing
+
+
+# Nematoda is a Phylum. Not clearly identifiable.
+
+
+# Nemertea is a Phylum. Not clearly identifiable.
+
+
+# Odonata is an Order
+# Entry for Order already existing
+
+
+# Oligochaeta is a subclass. Not clearly identifiable.
+
+
+# Oribatida is an Order.
+names_AUS[names_AUS$Family == "Oribatida", 3] <- "Oribatida"
+names_AUS[names_AUS$Family == "Oribatida", 4] <- NA
+
+
+# Pelecypoda is a Class. Identification via species names if existing
+# Corbiculoidea sp. is a Family
+names_AUS[names_AUS$Genus_and_species == "Corbiculoidea sp.", 4] <- "Corbiculidae"
+
+# Mussel not clearly identifiable
+
+# Bivalve Unid not clearly identifiable
+
+# Cockle belongs to Order Veneroida and Family Cardiidae. Many genera
+names_AUS[names_AUS$Genus_and_species == "Cockle", 3] <- "Veneroida"
+names_AUS[names_AUS$Genus_and_species == "Cockle", 4] <- "Cardiidae"
+names_AUS[names_AUS$Genus_and_species == "Cockle", 6] <- "NA"
+
+# Polychaeta spp., Polychaeta SE species, Polychaeta Sp 2, Polychaeta Sp 3 not clearly identifiable
+
+# Galeolaria is a Genus, Family Serpulidae, Order Canalipalpata
+names_AUS[names_AUS$Genus_and_species == "Galeolaria", 3] <- "Canalipalpata"
+names_AUS[names_AUS$Genus_and_species == "Galeolaria", 4] <- "Serpulidae"
+names_AUS[names_AUS$Genus_and_species == "Galeolaria", 5] <- "Galeolaria"
+names_AUS[names_AUS$Genus_and_species == "Galeolaria", 6] <- "NA"
+
+
+# Syncarida is a Super Order no identification possible
+names_AUS <- names_AUS[-1635, ]
+
+
+# Trichoptera is an Order.
+# Entry for Order already existing
+
+# Lepidoptera is an Order.
+names_AUS[grep("lepidoptera", names_AUS$Genus_and_species, ignore.case = TRUE), 3] <- "Lepidoptera"
 
 # Rest of the family entries withou the ending "-idae" are changed to NA
-names_AUS[!grepl("idae", names_AUS$Family), 3] <- NA
+names_AUS[!grepl("idae", names_AUS$Family), 4] <- "NA"
 
-# Remove rows containing only NAs
-names_AUS <- names_AUS[rowSums(is.na(names_AUS[1:6])) != ncol(names_AUS[1:6]), ]
 
-# Sort by long_code, Order, Family
-names_AUS <- names_AUS %>%
-  arrange(long_code, Order, Family)
+# --- Adding information for taxa columns if only speces entry is available
+names_AUS[!grepl("idae", names_AUS$Family), 3:7]
+names_AUS[grep("Odonata", names_AUS$Genus_and_species, ignore.case = TRUE), 3] <- "Odonata"
+names_AUS[grep("Neuroptera", names_AUS$Genus_and_species, ignore.case = TRUE), 3] <- "Neuroptera"
+names_AUS[grep("Ephemeroptera", names_AUS$Genus_and_species, ignore.case = TRUE), 3] <- "Ephemeroptera"
+names_AUS[grep("Plecoptera", names_AUS$Genus_and_species, ignore.case = TRUE), 3] <- "Plecoptera"
 
 
 # --- Correct entries for Order column
 levels(as.factor(names_AUS$Order))
 
 # Super Order Syncarida contains two families: Koonungidae (Order: Anaspidacea) and Parabathynellidae (Order: Bathynellacea)
-names_AUS[grepl("Super", names_AUS$Order), 2:6]
+names_AUS[grepl("syncarida", names_AUS$Order, ignore.case = TRUE), ]
 
 names_AUS[names_AUS$Family == "Koonungidae", 2] <- "Anaspidacea"
 names_AUS[names_AUS$Family == "Parabathynellidae", 2] <- "Bathynellacea"
 
 
-# --- Edit Genus and Species columns
-head(names_AUS, 15)
+# --- Remove rows containing only NAs
+names_AUS[names_AUS == "NA"] <- NA
+names_AUS <- names_AUS[rowSums(is.na(names_AUS[3:7])) != ncol(names_AUS[3:7]), ]
+
+# Sort by long_code, Order, Family
+names_AUS <- names_AUS %>%
+  arrange(long_code, Order, Family)
 
 
 #### Query traits to keep ####
