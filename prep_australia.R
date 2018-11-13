@@ -360,6 +360,7 @@ names_AUS <- names_AUS %>%
   arrange(long_code, Order, Family)
 
 
+
 #### Query traits to keep ####
 
 # Database Schäfer
@@ -416,8 +417,9 @@ keep_maxwell <- c(grep("EC|repro|resp|volt|disp|C_Maxwell|P_Maxwell|SH|C,SH|SC|P
 # Keep: Salinity preference, reproduction, respiration, voltinism, dispersal, feeding group
 
 # Final columns to keep
-fin_AUS <- names_AUS %>%
-  select(keep_shafer,
+fin_AUS <- df_AUS %>%
+  select(id_join,
+         keep_shafer,
          keep_gbr,
          keep_vicepa,
          keep_chessman,
@@ -610,8 +612,7 @@ feeding <- feeding %>%
   mutate(feed1 = ifelse(feed3 == "0", feed3_gbr, feed3),
          feed2 = ifelse(feed4 == "0", feed4_gbr, feed4),
          feed3 = ifelse(feed5 == "0", feed5_gbr, feed5),
-         feed4 = ifelse(feed6 == "0", feed6_gbr, feed6)) %>%
-  select(feed1:feed6)  
+         feed4 = ifelse(feed6 == "0", feed6_gbr, feed6))  
 
 
 # Last changes
@@ -624,6 +625,9 @@ for (i in seq_along(feeding)) {
   feeding[[i]][feeding[[i]] %in% replace] <- 1
 }
 feeding %>% mutate_all(as.factor) %>% sapply(levels)
+
+feeding <- feeding %>%
+  select(feed1:feed6)
 
 # Note: All shredder modalities were assigned to feed3 (hebivor)
 # Missing: "Feeding_absorber_VicEPA", 
@@ -798,7 +802,8 @@ drift <- drift %>%
 # 8. substrate8: Attached (permanent)
 
 sub_names <- grepl("habi", names(fin_AUS), ignore.case = TRUE) | grepl("attach", names(fin_AUS), ignore.case = TRUE)
-(substrate <- fin_AUS[sub_names])
+
+substrate <- fin_AUS[sub_names]
 
 substrate[substrate == "NA"] <- 0
 
@@ -822,7 +827,8 @@ substrate <- substrate %>%
 # Modality "EC4_Maxwell" is missing in database
 
 sal_names <- grepl("^sal", names(fin_AUS), ignore.case = TRUE) | grepl("^EC", names(fin_AUS), ignore.case = TRUE)
-(salinity <- fin_AUS[sal_names])
+
+salinity <- fin_AUS[sal_names]
 
 salinity[salinity == "NA"] <- 0
 
@@ -876,7 +882,7 @@ temp_names <- grepl("^ther", names(fin_AUS), ignore.case = TRUE)
 
 # Transform "Thermophily_Chessman2017" values to numeric 
 temperature <- transform(temperature, temperature = as.numeric(Thermophily_Chessman2017)) %>%
-  select(Ther1_botwe:Ther2_botwe, temperature)
+  select(Ther1_botwe:Ther3_botwe, temperature)
 
 temperature <- temperature %>%
   mutate(temp1 = ifelse(temperature < 6, 1, 0),
@@ -884,7 +890,7 @@ temperature <- temperature %>%
          temp3 = ifelse(temperature >= 10 & temperature < 18, 1, 0),
          temp4 = ifelse(temperature > 18, 1, 0),
          temp5 = "NA") %>%
-  mutate(temp5 = ifelse(temp5 == "NA", Ther2_botwe, temp5),
+  mutate(temp5 = ifelse(temp5 == "NA", Ther2_botwe, temp5), 
          temp5 = ifelse(temp5 == "NA", Ther3_botwe, temp5)) %>%
   select(temp1:temp5)
 
@@ -922,10 +928,18 @@ life <- life %>%
 # are not included in any database!
 
 
+
 #### Combine all traits with names_AUS ####
-df_AUS_complete <- cbind(names_AUS, voltinism, reproduction, feeding, respiration, drift,
-                         substrate, salinity, ph, temperature, life)
-write.table(df_AUS_complete, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_AUS.csv", sep = ",")
+
+# --- Combine trait information and add join ID
+trait_AUS <- cbind(voltinism, reproduction, feeding, respiration, drift, substrate, salinity, ph, temperature, life)
+trait_AUS$id_join <- 1:nrow(df_AUS_trait)
+
+# --- Merge names_AUS with trait_AUS via id_join
+df_AUS_compl <- merge(x = names_AUS, y = trait_AUS, by = "id_join", all.x = TRUE)
+
+# --- Save the database as .csv
+write.table(df_AUS_compl, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_AUS.csv", sep = ",")
 
 
 # Löschen?
