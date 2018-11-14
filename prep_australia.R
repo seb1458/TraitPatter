@@ -2,10 +2,14 @@
 #### Preparation: Australia database ####
 #---------------------------------------#
 
+# To Do: 
+# Bring first part of this script with AST_preprocessing together
+
+
+
 #### Working directory ####
-path <- "~/Schreibtisch/Thesis/data"
-
-
+# path <- "~/Schreibtisch/Thesis/data"
+path <- "/home/kunz/Dokumente/Trait DB"
 
 #### Packages ####
 library(tidyverse)
@@ -19,8 +23,8 @@ library(beepr)
 
 
 #### Load data ####
-df_AUS <- read_excel(file.path(path, "Australia", "Australian macroinv trait database.xlsx"))
-
+# df_AUS <- read_excel(file.path(path, "Australia", "Australian macroinv trait database.xlsx"))
+df_AUS <- read_excel(file.path(path, "Australian", "Australian macroinv trait database.xlsx"))
 
 
 #### Query taxon information ####
@@ -42,13 +46,26 @@ names_AUS <- names_AUS %>%
 levels(as.factor(names_AUS$Order))
 
 names_AUS <- names_AUS %>%
-  mutate(Order = ifelse(Order == "N/A", "NA", Order),
-         Order = ifelse(Order == "NULL", "NA", Order),
+  mutate(Order = ifelse(Order == "N/A", NA, Order),
+         Order = ifelse(Order == "NULL", NA, Order),
          Order = ifelse(Order == "Diplostraca - Cladocera", "Cladocera", Order),
          Order = ifelse(Order == "Diplostraca - Conchostraca", "Conchostraca", Order),
          Order = ifelse(Order == "Super Order Syncarida", Order_fam_Chessman2017, Order)) %>%
   select(-SAName_botwe, -Order_bugs_gbr, -Order_fam_Chessman2017) %>%
   rename(genus = Genus)
+
+# Data.table alternative - probably possible to do this in a more elegant way:
+# test <- names_AUS
+# test <- as.data.table(test)
+# 
+# test[Order %in% c("N/A", "NULL"), Order := NA] 
+# 
+# 
+# test[, Order := ifelse(grepl("Diplostraca.+", Order), 
+#                   ifelse(grepl(".+Cladocera", Order), "Cladocera", 
+#                      ifelse( grepl(".+Conchostraca", Order), "Conchostraca", Order)), Order)]
+
+
 
 fin_AUS <- cbind(names_AUS, df_AUS[, 5:ncol(df_AUS)])
 fin_AUS <- fin_AUS %>%
