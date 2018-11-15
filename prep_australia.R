@@ -2,10 +2,14 @@
 #### Preparation: Australia database ####
 #---------------------------------------#
 
+# To Do: 
+# Bring first part of this script with AST_preprocessing together
+
+
+
 #### Working directory ####
-path <- "~/Schreibtisch/Thesis/data"
-
-
+# path <- "~/Schreibtisch/Thesis/data"
+path <- "/home/kunz/Dokumente/Trait DB"
 
 #### Packages ####
 library(tidyverse)
@@ -19,12 +23,11 @@ library(beepr)
 
 
 #### Load data ####
+
 df_AUS <- read_excel(file.path(path, "Australia", "Australian macroinv trait database.xlsx"), sheet = 1)
 
 # Add ID for later join
 df_AUS$id_join <- 1:nrow(df_AUS)
-
-
 
 
 #### Query taxon information ####
@@ -82,11 +85,39 @@ names_AUS <- merge(x = names_AUS, y = id_list, by = "long_code", all.x = TRUE)
 
 # Combine information from both tables in new columns. Delete old columns
 names_AUS <- names_AUS %>%
-  mutate(Order = ifelse(Order == "NA", Order.vic, Order),
-         Family = ifelse(Family == "NA", Family.vic, Family)) %>%
-  select(-Order.vic, -Family.vic) %>%
-  rename(Species = Species.vic)
 
+ # mutate(Order = ifelse(Order == "NA", Order.vic, Order),
+ #        Family = ifelse(Family == "NA", Family.vic, Family)) %>%
+ # select(-Order.vic, -Family.vic) %>%
+ # rename(Species = Species.vic)
+
+  mutate(Order = ifelse(Order == "N/A", NA, Order),
+         Order = ifelse(Order == "NULL", NA, Order),
+         Order = ifelse(Order == "Diplostraca - Cladocera", "Cladocera", Order),
+         Order = ifelse(Order == "Diplostraca - Conchostraca", "Conchostraca", Order),
+         Order = ifelse(Order == "Super Order Syncarida", Order_fam_Chessman2017, Order)) %>%
+  select(-SAName_botwe, -Order_bugs_gbr, -Order_fam_Chessman2017) %>%
+  rename(genus = Genus)
+
+# Data.table alternative - probably possible to do this in a more elegant way:
+# test <- names_AUS
+# test <- as.data.table(test)
+# 
+# test[Order %in% c("N/A", "NULL"), Order := NA] 
+# 
+# 
+# test[, Order := ifelse(grepl("Diplostraca.+", Order), 
+#                   ifelse(grepl(".+Cladocera", Order), "Cladocera", 
+#                      ifelse( grepl(".+Conchostraca", Order), "Conchostraca", Order)), Order)]
+
+
+
+fin_AUS <- cbind(names_AUS, df_AUS[, 5:ncol(df_AUS)])
+fin_AUS <- fin_AUS %>%
+  select(-Genus, -Subfamily, -SAName_botwe, -Order_fam_Chessman2017, -name_in_Schafer, -Phylum_bugs_gbr, -Class_bugs_gbr,
+         -Order_bugs_gbr, -`Sub-family_bugs_gbr`, -`Sub-order_bugs_gbr`, -Class_or_subClass, -Phylum, -Group_or_subPhylum,
+         -TrueFamily) %>%
+  rename(Genus = genus)
 
  
 #### Final Preparation of Taxa Information ####
