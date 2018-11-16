@@ -44,6 +44,23 @@ genus <- df_AUS$Genus_and_species; botwe <- df_AUS$SAName_botwe
 df_AUS$Genus_and_species <- coalesce(genus, botwe)
 rm(genus, botwe)
 
+# --- Find and remove duplicated entries in names_AUS$long_code
+df_AUS %>% 
+  group_by(long_code) %>% 
+  filter(n() > 1) %>%
+  arrange(desc(long_code)) %>%
+  select(long_code:Genus_and_species)
+
+# Seperate entries with NAs in long_code from rest
+AUS_na <- df_AUS[is.na(df_AUS$long_code), ]
+
+# Select only entries without duplicate entries in long_code
+df_AUS <- df_AUS[!duplicated(df_AUS$long_code) & !is.na(df_AUS$long_code), ]
+
+# Put non-duplicates and NAs back together
+df_AUS <- rbind(df_AUS, AUS_na)
+rm(AUS_na)
+
 
 #### Table Join with the ID list ####
 # ID list from Ben Kefford with long_code data and taxon information
@@ -93,46 +110,74 @@ df_AUS$Family <- coalesce(fam, vic)
 rm(fam, vic)
 
 
- 
-#### Final Preparation of Taxa Information ####
 
+#### Preprocessing Script with data.table ####
+# Trying to resolve crude taxa names
+# differentiate into species column and unresolved taxa
+df_AUS <- as.data.table(df_AUS)
+df_AUS[, `:=`(Species = lapply(Genus_and_species, function(y) {
+  val <- grep("Genus|.*sp.*|group.*|unknown|.*unidentif.*|undifferentiated|.*SO[1-9]|.*L10.*|Ecnomina|Kingolus / Simsonia.*", 
+              y, value = TRUE, invert = TRUE, ignore.case = TRUE)
+  val <- grep("[A-z] [A-z]", val, value = TRUE)
+  ifelse(identical(val, character(0)), NA, val)
+}
+), 
+Unresolved_taxa = lapply(Genus_and_species, function(y) {
+  val <- grep("Genus|.*sp.*|group.*|unknown|.*unidentif.*|undifferentiated|.*SO[1-9]|.*L10.*|Ecnomina|Kingolus / Simsonia.*", 
+              y, value = TRUE, ignore.case = TRUE)
+  ifelse(identical(val, character(0)), NA, val)
+}
+)
+)]
+
+
+# compare Unresolved_taxa column with Genus column with regard to sp. and spp. 
+# AST_trait_DB[Unresolved_taxa %like% "sp.$|spp.$", (lapply(.SD, function(y) ifelse(is.na(y), Unresolved_taxa,
+#                                                                                        as.character(y)))), 
+#              .SDcols = "Genus"]
+
+
+# Delete Genus_and_species column
+df_AUS[, Genus_and_species := NULL]
+
+
+# set order of columns
+setcolorder(df_AUS, c("Order", "Family", "Genus", "Species", "long_code", "short_code","Unresolved_taxa"))
+
+
+# Some colnames contian "." or ".." -> needs to be changed
+setnames(x = df_AUS, old = names(df_AUS), 
+         new = gsub(pattern = "\\.", replacement = "_", x = names(df_AUS)))
+
+
+# still some colnames have two "_" 
+setnames(x = df_AUS, old = names(df_AUS), 
+         new = gsub(pattern = "\\__", replacement = "_", x = names(df_AUS)))
+
+
+# Some columns have list as type -> change to write table
+grep("list", sapply(df_AUS, typeof), value = TRUE)
+names(df_AUS)
+ 
+
+#### Final Preparation of Taxa Information ####
 # --- Delete incomplete information
 # When NA in Family and long_code: no identification possible
-names_AUS <- names_AUS %>%
-  filter(!(Family == "NA" & long_code == "NA"))
+df_AUS <- df_AUS %>%
+  filter(!(is.na(Family) & is.na(long_code)))
 
 # --- Strange code data: MITEXXXX dismissed for now
 # names_AUS <- names_AUS[!grepl("mite", names_AUS$long_code, ignore.case = TRUE), ]
 
-# --- Find and remove duplicated entries in names_AUS$long_code
-test <- names_AUS %>% 
-  group_by(long_code) %>% 
-  filter(n() > 1) %>%
-  arrange(desc(long_code))
+# --- Remove rows with all NAs in the taxon and code columns
+df_AUS <- df_AUS[rowSums(is.na(df_AUS[1:5])) < 5, ] 
 
-# Seperate entries with NAs in long_code from rest
-names_AUS_code_na <- names_AUS[names_AUS$long_code == "NA", ]
-
-# Select only entries without duplicate entries in long_code
-names_AUS <- names_AUS[!duplicated(names_AUS$long_code) & names_AUS$long_code != "NA", ]
-
-# But non-duplicates and NAs back together
-names_AUS <- rbind(names_AUS, names_AUS_code_na)
-rm(names_AUS_code_na)
-
-# --- Replace "false" missing values
-names_AUS[names_AUS == "N/A"] <- NA
-names_AUS[names_AUS == "NULL"] <- NA
-names_AUS[names_AUS == "NA"] <- NA
-
-names_AUS <- names_AUS[!(rowSums(is.na(names_AUS[3:7])) == ncol(names_AUS[3:7])), ] 
 
 
 #### Complement Information ####
-
 # --- Some entries with missing Order but with information in Family column. 
 # 1. Get all order and family names where Order is not NA
-order_compl <- names_AUS[!is.na(names_AUS$Order), 3:4] %>%
+order_compl <- df_AUS[!is.na(df_AUS$Order), 1:2] %>%
   unique()
 
 # 2. Dismiss all rows with NA as family entry and all duplicates
@@ -140,18 +185,18 @@ order_compl <- order_compl[!is.na(order_compl$Family), ]
 order_compl <- order_compl[!duplicated(order_compl$Family), ]
 
 # 3. Table join to complete entries
-names_AUS <- merge(x = names_AUS, y = order_compl, by = "Family", all.x = TRUE) 
+df_AUS <- merge(x = df_AUS, y = order_compl, by = "Family", all.x = TRUE) 
 
 # Order.x = old Order names, Order.y = complete Order names
-names_AUS <- names_AUS %>%
+df_AUS <- df_AUS %>%
   rename(Order = Order.y) %>%
-  select(long_code, id_join, Order, Family, Genus, Genus_and_species, Species)
+  select(Order, Family, Genus, Species, long_code, everything()) 
 
 
 # --- Correct entries for Family column
-levels(as.factor(names_AUS$Family))
+levels(as.factor(df_AUS$Family))
 
-names_AUS <- names_AUS %>%
+df_AUS <- df_AUS %>%
   mutate(Family = ifelse(Family == "Anisoptera (dragonflies)", NA, Family),
          Family = ifelse(Family == "Arrenuridae (water mite)", "Arrenuridae", Family),
          Family = ifelse(Family == "Aturidae (water mites)", "Aturidae", Family),
@@ -168,13 +213,15 @@ names_AUS <- names_AUS %>%
 
 
 # --- Correct entries which are not a family name
-names_AUS[!grepl("idae", names_AUS$Family), 3:7]
-levels(as.factor(names_AUS[!grepl("idae", names_AUS$Family), 4]))
-names_AUS[is.na(names_AUS)] <- "NA"
+df_AUS[!grepl("idae", df_AUS$Family), 1:5]
+
+levels(as.factor(df_AUS[!grepl("idae", df_AUS$Family), 2]))
 
 # Acarina is a subclass name. Acariformes is the super order name
 # Acariformes has following orders: Sarcoptiformes, Trombidiformes, Oribatida, Mesostigmata
+rows <- which(df_AUS$Order == "Acariformes")
 
+df_AUS[rows, 1:5]
 # 1. Halacaroidea: super family name
 # Order: Trombidiformes
 
