@@ -9,6 +9,7 @@ path <- "~/Schreibtisch/Thesis/data"
 
 #### Packages ####
 library(tidyverse)
+library(data.table)
 library(readxl)
 library(reshape2)
 
@@ -62,6 +63,7 @@ df_AUS <- rbind(df_AUS, AUS_na)
 rm(AUS_na)
 
 
+
 #### Table Join with the ID list ####
 # ID list from Ben Kefford with long_code data and taxon information
 # NOTE: The file containing the long_codes has some format errors for some cells. Remove manually in spreadsheet.
@@ -109,6 +111,29 @@ fam <- df_AUS$Family; vic <- df_AUS$Family.vic
 df_AUS$Family <- coalesce(fam, vic)
 rm(fam, vic)
 
+# 3. Species information
+spec <- df_AUS$Genus_and_species; vic <- df_AUS$Species.vic
+
+df_AUS$Genus_and_species <- coalesce(spec, vic)
+rm(spec, vic)
+
+df_AUS <- df_AUS %>%
+  select(-Order.vic, -Family.vic, -Species.vic)
+
+
+
+#### Final Preparation of Taxa Information ####
+# --- Delete incomplete information
+# When NA in Family and long_code: no identification possible
+df_AUS <- df_AUS %>%
+  filter(!(is.na(Family) & is.na(long_code)))
+
+# --- Strange code data: MITEXXXX dismissed for now
+# names_AUS <- names_AUS[!grepl("mite", names_AUS$long_code, ignore.case = TRUE), ]
+
+# --- Remove rows with all NAs in the taxon and code columns
+df_AUS <- df_AUS[rowSums(is.na(df_AUS[1:5])) < 5, ] 
+
 
 
 #### Preprocessing Script with data.table ####
@@ -142,7 +167,7 @@ df_AUS[, Genus_and_species := NULL]
 
 
 # set order of columns
-setcolorder(df_AUS, c("Order", "Family", "Genus", "Species", "long_code", "short_code","Unresolved_taxa"))
+setcolorder(df_AUS, c("Order", "Family", "Genus", "Species", "long_code", "short_code", "Unresolved_taxa"))
 
 
 # Some colnames contian "." or ".." -> needs to be changed
@@ -159,19 +184,6 @@ setnames(x = df_AUS, old = names(df_AUS),
 grep("list", sapply(df_AUS, typeof), value = TRUE)
 names(df_AUS)
  
-
-#### Final Preparation of Taxa Information ####
-# --- Delete incomplete information
-# When NA in Family and long_code: no identification possible
-df_AUS <- df_AUS %>%
-  filter(!(is.na(Family) & is.na(long_code)))
-
-# --- Strange code data: MITEXXXX dismissed for now
-# names_AUS <- names_AUS[!grepl("mite", names_AUS$long_code, ignore.case = TRUE), ]
-
-# --- Remove rows with all NAs in the taxon and code columns
-df_AUS <- df_AUS[rowSums(is.na(df_AUS[1:5])) < 5, ] 
-
 
 
 #### Complement Information ####
@@ -190,7 +202,8 @@ df_AUS <- merge(x = df_AUS, y = order_compl, by = "Family", all.x = TRUE)
 # Order.x = old Order names, Order.y = complete Order names
 df_AUS <- df_AUS %>%
   rename(Order = Order.y) %>%
-  select(Order, Family, Genus, Species, long_code, everything()) 
+  select(Order, Family, Genus, Species, long_code, Unresolved_taxa, everything())
+rm(order_compl)
 
 
 # --- Correct entries for Family column
@@ -213,15 +226,15 @@ df_AUS <- df_AUS %>%
 
 
 # --- Correct entries which are not a family name
-df_AUS[!grepl("idae", df_AUS$Family), 1:5]
+df_AUS[!grepl("idae", df_AUS$Family), 1:6]
 
 levels(as.factor(df_AUS[!grepl("idae", df_AUS$Family), 2]))
 
 # Acarina is a subclass name. Acariformes is the super order name
 # Acariformes has following orders: Sarcoptiformes, Trombidiformes, Oribatida, Mesostigmata
 rows <- which(df_AUS$Order == "Acariformes")
+df_AUS[rows, 1:6]
 
-df_AUS[rows, 1:5]
 # 1. Halacaroidea: super family name
 # Order: Trombidiformes
 
@@ -229,7 +242,9 @@ df_AUS[rows, 1:5]
 # Order: Trombidiformes
 
 # 3. Mesostigmata: order name
-names_AUS[names_AUS$Species == "Mesostigmata (Unident.)", 3] <- "Mesostigmata"
+rows <- which(df_AUS$Unresolved_taxa == "Mesostigmata spp.")
+
+df_AUS[rows, 1] <- "Mesostigmata"
 
 # 4. Trombidioidea: super family name
 # Order: Trombidiformes
@@ -238,45 +253,40 @@ names_AUS[names_AUS$Species == "Mesostigmata (Unident.)", 3] <- "Mesostigmata"
 # Order: Sarcoptiformes
 
 # 6. Oribatida: order name 
-names_AUS[names_AUS$Species == "Oribatida (Unident.)", 3] <- "Oribatida"
+rows <- which(df_AUS$Unresolved_taxa == "Oribatida spp.")
+
+df_AUS[rows, 1] <- "Oribatida"
+
 
 # Species belonging to Sarcoptiformes
-names_AUS[names_AUS$Family == "Hydrozetidae" |
-            names_AUS$Species == "Astigmata (Unident.)", 3] <- "Sarcoptiformes"
+rows <- which(df_AUS$Unresolved_taxa == "Astigmata spp.")
+
+df_AUS[rows, 1] <- "Sarcoptiformes"
+
 
 # Species belonging to Trombidiformes
-names_AUS[names_AUS$Family == "Anisitsiellidae" |
-            names_AUS$Family == "Arrenuridae" |
-            names_AUS$Family == "Astacocrotonidae" |
-            names_AUS$Family == "Aturidae" |
-            names_AUS$Family == "Eylaidae" |
-            names_AUS$Family == "Halacaridae " |
-            names_AUS$Family == "Hydrachnidae" |
-            names_AUS$Family == "Hydrodromidae" |
-            names_AUS$Family == "Hydryphantidae" |
-            names_AUS$Family == "Hygrobatidae" |
-            names_AUS$Family == "Johnstonianidae" |
-            names_AUS$Family == "Limnesiidae" |
-            names_AUS$Family == "Limnocharidae" |
-            names_AUS$Family == "Mideopsidae" |
-            names_AUS$Family == "Momoniidae" |
-            names_AUS$Family == "Oxidae" |
-            names_AUS$Family == "Pezidae" |
-            names_AUS$Family == "Pionidae" |
-            names_AUS$Family == "Torrenticolidae" |
-            names_AUS$Family == "Unionicolidae" |
-            names_AUS$Family == "Zelandothyadidae" |
-            names_AUS$Species == "Trombidioidea (Unident.)" |
-            names_AUS$Species == "Halacaroidea (Unident.)" |
-            names_AUS$Species == "Hydracarina (Unident.)", 3] <- "Trombidiformes"
+rows <- which(df_AUS$Unresolved_taxa == "Halacoroidea spp.")
+df_AUS[rows, 1] <- "Trombidiformes"
+
+rows <- which(df_AUS$Unresolved_taxa == "Hydracarina spp.")
+df_AUS[rows, 1] <- "Trombidiformes"
+
+rows <- which(df_AUS$Unresolved_taxa == "Trombidioidea spp.")
+df_AUS[rows, 1] <- "Trombidiformes"
 
 
 # Amphipoda is the Order
+rows <- which(df_AUS$Family == "Amphipoda")
+df_AUS[rows, 1:6]
 # Entry for order already existing
 
 
 # Brachyura is an Infraorder. Actual Order is Decapoda
-names_AUS[names_AUS$Family == "Brachyura", 3] <- "Decapoda"
+rows <- which(df_AUS$Family == "Brachyura")
+df_AUS[rows, 1:6]
+
+df_AUS[rows, 1] <- "Decapoda"
+df_AUS[rows, 2] <- NA
 
 
 # Caridea is an Infraorder. Actual Order is Decapoda
@@ -292,7 +302,11 @@ names_AUS[names_AUS$Family == "Brachyura", 3] <- "Decapoda"
 
 
 # Decapoda is an Order
-names_AUS[names_AUS$Family == "Decapoda", 3] <- "Decapoda"
+rows <- which(df_AUS$Family == "Decapoda")
+df_AUS[rows, 1:6]
+
+df_AUS[rows, 1] <- "Decapoda"
+df_AUS[rows, 2] <- NA
 
 
 # Diptera is an Order
@@ -300,21 +314,14 @@ names_AUS[names_AUS$Family == "Decapoda", 3] <- "Decapoda"
 
 
 # Gastropoda is a Class. Identification via species names if existing
-# 1. Bembicium is a Genus, Order is Littorinimorpha
-names_AUS[names_AUS$Genus_and_species == "Bembicium", 5] <- "Bembicium"
-names_AUS[names_AUS$Genus_and_species == "Bembicium", 3] <- "Littorinimorpha"
-names_AUS[names_AUS$Genus_and_species == "Bembicium", 6] <- "NA"
+rows <- which(df_AUS$Family == "Gastropoda")
+df_AUS[rows, 1:6]
 
-# 2. Whelk is used for many different species. No clear identification
+# 1. Whelk is used for many different species. No clear identification
 
-# 3. Turban-shell belongs to the Turbinidae (turban snails) (?). No order found
-names_AUS[names_AUS$Genus_and_species == "Turban-shell", 5] <- "Turbo"
-names_AUS[names_AUS$Genus_and_species == "Turban-shell", 4] <- "Turbinidae"
-names_AUS[names_AUS$Genus_and_species == "Turban-shell", 6] <- "NA"
-
-# 4. Conuber belongs to the Turbinidae (turban snails) (?). No order found
-names_AUS[names_AUS$Genus_and_species == "Conuber spp.", 5] <- "Conuber"
-names_AUS[names_AUS$Genus_and_species == "Turban-shell", 4] <- "Naticidae"
+# 2. Conuber belongs to the Turbinidae (turban snails) (?). No order found
+rows <- which(df_AUS$long_code == "KG9999A1")
+df_AUS[rows, 3] <- "Conuber"
 
 # 5. Gastropoda sp. not clearly identifiable
 
@@ -345,71 +352,63 @@ names_AUS[names_AUS$Genus_and_species == "Turban-shell", 4] <- "Naticidae"
 
 
 # Oribatida is an Order.
-names_AUS[names_AUS$Family == "Oribatida", 3] <- "Oribatida"
-names_AUS[names_AUS$Family == "Oribatida", 4] <- NA
+rows <- which(df_AUS$Family == "Oribatida")
+df_AUS[rows, 1:6]
+
+df_AUS[rows, 1] <- "Oribatida"
+df_AUS[rows, 2] <- NA
 
 
 # Pelecypoda is a Class. Identification via species names if existing
 # Corbiculoidea sp. is a Family
-names_AUS[names_AUS$Genus_and_species == "Corbiculoidea sp.", 4] <- "Corbiculidae"
+rows <- which(df_AUS$Family == "Pelecypoda")
+df_AUS[rows, 1:6]
+
+df_AUS[rows[2], 2] <- "Corbiculidae"
 
 # Mussel not clearly identifiable
 
 # Bivalve Unid not clearly identifiable
 
-# Cockle belongs to Order Veneroida and Family Cardiidae. Many genera
-names_AUS[names_AUS$Genus_and_species == "Cockle", 3] <- "Veneroida"
-names_AUS[names_AUS$Genus_and_species == "Cockle", 4] <- "Cardiidae"
-names_AUS[names_AUS$Genus_and_species == "Cockle", 6] <- "NA"
-
 # Polychaeta spp., Polychaeta SE species, Polychaeta Sp 2, Polychaeta Sp 3 not clearly identifiable
-
-# Galeolaria is a Genus, Family Serpulidae, Order Canalipalpata
-names_AUS[names_AUS$Genus_and_species == "Galeolaria", 3] <- "Canalipalpata"
-names_AUS[names_AUS$Genus_and_species == "Galeolaria", 4] <- "Serpulidae"
-names_AUS[names_AUS$Genus_and_species == "Galeolaria", 5] <- "Galeolaria"
-names_AUS[names_AUS$Genus_and_species == "Galeolaria", 6] <- "NA"
 
 
 # Syncarida is a Super Order no identification possible
-names_AUS <- names_AUS[-1635, ]
 
 
 # Trichoptera is an Order.
 # Entry for Order already existing
 
 # Lepidoptera is an Order.
-names_AUS[grep("lepidoptera", names_AUS$Genus_and_species, ignore.case = TRUE), 3] <- "Lepidoptera"
+rows <- which(df_AUS$Family == "Lepidoptera")
+df_AUS[rows, 1:6]
 
-# Rest of the family entries withou the ending "-idae" are changed to NA
-names_AUS[!grepl("idae", names_AUS$Family), 4] <- "NA"
+df_AUS[rows, 2] <- NA
 
 
-# --- Adding information for taxa columns if only speces entry is available
-names_AUS[!grepl("idae", names_AUS$Family), 3:7]
-names_AUS[grep("Odonata", names_AUS$Genus_and_species, ignore.case = TRUE), 3] <- "Odonata"
-names_AUS[grep("Neuroptera", names_AUS$Genus_and_species, ignore.case = TRUE), 3] <- "Neuroptera"
-names_AUS[grep("Ephemeroptera", names_AUS$Genus_and_species, ignore.case = TRUE), 3] <- "Ephemeroptera"
-names_AUS[grep("Plecoptera", names_AUS$Genus_and_species, ignore.case = TRUE), 3] <- "Plecoptera"
+# Some entries left, which are not identifiable
+df_AUS <- df_AUS %>%
+  select(Order, Family, Genus, Species, Unresolved_taxa, long_code, everything())
+
+df_AUS <- df_AUS[rowSums(is.na(df_AUS[1:5])) < 5, ] 
+
+df_AUS[!grepl("idae", df_AUS$Family), 1:6]
+
+# Lepidoptera in Unresolved Taxa
+df_AUS[grepl("lepidoptera", df_AUS$Unresolved_taxa, ignore.case = TRUE), 1] <- "Lepidoptera"
+
 
 
 # --- Correct entries for Order column
-levels(as.factor(names_AUS$Order))
+levels(as.factor(df_AUS$Order))
 
 # Super Order Syncarida contains two families: Koonungidae (Order: Anaspidacea) and Parabathynellidae (Order: Bathynellacea)
-names_AUS[grepl("syncarida", names_AUS$Order, ignore.case = TRUE), ]
+rows <- which(df_AUS$Order == "Super Order Syncarida")
+df_AUS[rows, 1:6]
 
-names_AUS[names_AUS$Family == "Koonungidae", 2] <- "Anaspidacea"
-names_AUS[names_AUS$Family == "Parabathynellidae", 2] <- "Bathynellacea"
-
-
-# --- Remove rows containing only NAs
-names_AUS[names_AUS == "NA"] <- NA
-names_AUS <- names_AUS[rowSums(is.na(names_AUS[3:7])) != ncol(names_AUS[3:7]), ]
-
-# Sort by long_code, Order, Family
-names_AUS <- names_AUS %>%
-  arrange(long_code, Order, Family)
+df_AUS[rows[1:2], 1] <- "Anaspidacea"
+df_AUS[rows[3], 1] <- "Bathynellacea"
+# Family Syncarida is non-existent
 
 
 
@@ -418,7 +417,7 @@ names_AUS <- names_AUS %>%
 # Database Schäfer
 (names_shafer <- grep("shafer", names(df_AUS), ignore.case = TRUE, value = TRUE))
 
-keep_shafer <- c(grep("(mS/cm)_Shafer|per_year_Shafer|type_Shafer|capacity_Shafer|group_Shafer|number__Shafer|Respiration__Shafer",
+keep_shafer <- c(grep("(mS/cm)_Shafer|per_year_Shafer|type_Shafer|capacity_Shafer|group_Shafer|number_Shafer|Respiration_Shafer",
                       names_shafer, value = TRUE, ignore.case = TRUE))
 
 # Keeping: Salinity toelrance, number of generations per year, reproduction type, dispersal capacity, max body size, respiration
@@ -699,10 +698,10 @@ feeding <- feeding %>%
 # Modality "Gills (larvae), air-breathing (adult)" transformed to resp2
 # Modality "Plastron and gills" transformed to resp3
 fin_AUS <- fin_AUS %>%
-  mutate(resp1_shafer.new = ifelse(grepl("cutaneous", fin_AUS$Respiration__Shafer, ignore.case = TRUE), 1, 0),
-         resp2_shafer.new = ifelse(grepl("Gills", fin_AUS$Respiration__Shafer), 1, 0),
-         resp3_shafer.new = ifelse(grepl("plastron", fin_AUS$Respiration__Shafer, ignore.case = TRUE), 1, 0),
-         resp4_shafer.new = ifelse(grepl("breathing", fin_AUS$Respiration__Shafer, ignore.case = TRUE), 1, 0))
+  mutate(resp1_shafer.new = ifelse(grepl("cutaneous", fin_AUS$Respiration_Shafer, ignore.case = TRUE), 1, 0),
+         resp2_shafer.new = ifelse(grepl("Gills", fin_AUS$Respiration_Shafer), 1, 0),
+         resp3_shafer.new = ifelse(grepl("plastron", fin_AUS$Respiration_Shafer, ignore.case = TRUE), 1, 0),
+         resp4_shafer.new = ifelse(grepl("breathing", fin_AUS$Respiration_Shafer, ignore.case = TRUE), 1, 0))
 
 
 # --- GBR
@@ -811,8 +810,8 @@ fin_AUS <- fin_AUS %>%
 # disp1_Maxwell was converted to drift1_maxwell.new
 # disp2_Maxwell was converted to drift3_maxwell.new
 fin_AUS <- fin_AUS %>%
-  mutate(drift1_maxwell.new = disp.low_Maxwell,
-         drift3_maxwell.new = disp.drift_Maxwell)
+  mutate(drift1_maxwell.new = disp_low_Maxwell,
+         drift3_maxwell.new = disp_drift_Maxwell)
 
 # --- Botwe
 fin_AUS <- fin_AUS %>%
@@ -985,73 +984,21 @@ life <- life %>%
 
 # --- Combine trait information and add join ID
 trait_AUS <- cbind(voltinism, reproduction, feeding, respiration, drift, substrate, salinity, ph, temperature, life)
-trait_AUS$id_join <- 1:nrow(df_AUS_trait)
+trait_AUS$id_join <- 1:nrow(trait_AUS)
+
+# --- Taxon information from df_AUS
+names_AUS <- df_AUS %>%
+  select(Order:Species, id_join)
 
 # --- Merge names_AUS with trait_AUS via id_join
 df_AUS_compl <- merge(x = names_AUS, y = trait_AUS, by = "id_join", all.x = TRUE)
 df_AUS_compl <- select(df_AUS_compl, -id_join)
 
+# --- Remove rows with all NAs in trait columns
+df_AUS_compl <- df_AUS_compl[rowSums(is.na(df_AUS_compl[5:ncol(df_AUS_compl)])) < ncol(df_AUS_compl[5:ncol(df_AUS_compl)]), ] 
+
+# --- df_AUS_compl$Species as.character
+df_AUS_compl$Species <- as.character(df_AUS_compl$Species)
+
 # --- Save the database as .csv
 write.table(df_AUS_compl, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_AUS.csv", sep = ",")
-
-
-# Löschen?
-#### Format dataframe ####
-
-# # Format all data do wide
-# # Shafer: some traits are problematic due to high number of different modalities 
-# # (e.g Physiological_Salinity_Tolerance, Number of generations per year, ...)
-# grep("shafer", names(df_AUS), ignore.case = TRUE, value = TRUE)
-# 
-# df_AUS <- df_AUS %>%
-#   mutate(rep_eggs_aqu_shafer = ifelse(Reproduction_type_Shafer == "Aquatic eggs", 1, 0),
-#          rep_eggs_veg_shafer = ifelse(Reproduction_type_Shafer == "Eggs attached to plants", 1, 0),
-#          rep_eggs_sub_shafer = ifelse(Reproduction_type_Shafer == "Eggs attached to substrate", 1, 0),
-#          rep_eggs_inv_shafer = ifelse(Reproduction_type_Shafer == "Eggs inside plants/objects in or near water", 1, 0),
-#          rep_eggs_fre_shafer = ifelse(Reproduction_type_Shafer == "free eggs", 1, 0),
-#          rep_eggs_ter_shafer = ifelse(Reproduction_type_Shafer == "Ovoviviparity", 1, 0),
-#          rep_ovov_sim_shafer = ifelse(Reproduction_type_Shafer == "Ovoviviparity (brood pouch)", 1, 0),
-#          rep_ovov_pou_shafer = ifelse(Reproduction_type_Shafer == "some taxa terrestrial eggs", 1, 0),
-#          feed_detritivores_shafer = ifelse(Feeding_group_Shafer == "Detritivores", 1, 0),
-#          feed_detr_and_herb_shafer = ifelse(Feeding_group_Shafer == "Detritivores and Herbivores", 1, 0),
-#          feed_detr_or_pred_shafer = ifelse(Feeding_group_Shafer == "Detritivores or predators", 1, 0),
-#          feed_herbivores_shafer = ifelse(Feeding_group_Shafer == "Herbivores", 1, 0),
-#          feed_parasite_shafer = ifelse(Feeding_group_Shafer == "Parasite", 1, 0),
-#          feed_predator_shafer = ifelse(Feeding_group_Shafer == "Predator", 1, 0),
-#          resp_atmos_shafer = ifelse(Respiration__Shafer == "Air-breathing", 1, 0),
-#          resp_cutan_shafer = ifelse(Respiration__Shafer == "Cutaneous", 1, 0),
-#          resp_gills_shafer = ifelse(Respiration__Shafer == "Gills", 1, 0),
-#          resp_gills_and_atmos_shafer = ifelse(Respiration__Shafer == "Gills (larvae), air-breathing (adult)", 1, 0),
-#          resp_plastron_and_gills_shafer = ifelse(Respiration__Shafer == "Plastron and gills", 1, 0),
-#          resp_pneumo_shafer = ifelse(Respiration__Shafer == "Pneumostome", 1, 0)
-#   )
-# 
-# # Missing: salinity tolerance, sorg, number of generations per year, time until reproduction, dispersal capacity, max body size
-# 
-# # Bugs GBR: see problems for shafer
-# grep("bugs", names(df_AUS), ignore.case = TRUE, value = TRUE)
-# 
-# df_AUS <- df_AUS %>%
-#   mutate(feed_detritivores_gbr = ifelse(Feeding_group_bugs_gbr == "Detritivores", 1, 0),
-#          feed_detr_and_herb_gbr = ifelse(Feeding_group_bugs_gbr == "Detritivores and Herbivores", 1, 0),
-#          feed_detr_or_pred_gbr = ifelse(Feeding_group_bugs_gbr == "Detritivores or predators", 1, 0),
-#          feed_herbivores_gbr = ifelse(Feeding_group_bugs_gbr == "Herbivores|Algae|Herbivores (some piercer)|Plants", 1, 0),
-#          feed_parasite_gbr = ifelse(Feeding_group_bugs_gbr == "Parasite", 1, 0),
-#          feed_predator_gbr = ifelse(Feeding_group_bugs_gbr== "Predator", 1, 0),
-#          feed_herb_and_pred_gbr = ifelse(Feeding_group_bugs_gbr == "Algae, plants and some predators" , 1, 0),
-#          feed_la_pred_ad_herb_gbr = ifelse(Feeding_group_bugs_gbr== "larvea predators, adults herbivores" , 1, 0),
-#          feed_para_and_pred_gbr = ifelse(Feeding_group_bugs_gbr == "Parasites and predators (mainly snails)" , 1, 0),
-#          feed_scav_gbr = ifelse(Feeding_group_bugs_gbr == "Scavenger" , 1, 0),
-#          resp_atmos_simp_gbr = ifelse(Respiration_bugs_gbr == "Air-breathing", 1, 0),
-#          resp_atmos_plan_gbr = ifelse(Respiration_bugs_gbr == "Air-breathing (piercing plants)", 1, 0),
-#          resp_atmos_surf_gbr = ifelse(Respiration_bugs_gbr == "Air-breathing (return to surface)", 1, 0),
-#          resp_cutan_gbr = ifelse(Respiration_bugs_gbr == "Cutaneous", 1, 0),
-#          resp_gills_gbr = ifelse(Respiration_bugs_gbr == "Gills", 1, 0),
-#          resp_la_gills_ad_atmos_simp_gbr = ifelse(Respiration_bugs_gbr == "Gills (larvae), air-breathing (adult)", 1, 0),
-#          resp_plast_and_gills_gbr = ifelse(Respiration_bugs_gbr == "Plastron and gills", 1, 0),
-#          resp_pneumo_gbr = ifelse(Respiration_bugs_gbr == "Pneumostome", 1, 0)
-#   )
-# 
-# # Missing: number of generations, change gen per year, repoduction, dispersal, max body size
-
-# Test
