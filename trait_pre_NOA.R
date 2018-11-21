@@ -249,8 +249,7 @@ table(as.factor(df_NAM$Habit_prim))
 
 
 # ---- Oxygen/Saprobity ----
-saprobity <- df_NOA %>%
-  select(O2_normal, O2_low)
+saprobity <- select(df_NOA, O2_normal, O2_low)
 
 
 # --- pH Preference ----
@@ -266,3 +265,10 @@ levels(as.factor(df_NOA$Thermal_pref))
 
 # ---- Salinity Preference
 # Assigning levels via df_NOA$Salin_fresh, df_NOA$Salin_brakish, df_NOA$Salin_salt?
+
+# ------------------------------------------------------------------------------------------------------------------------- #
+#### Final table ####
+NOA_tax <- df_NOA %>% select(Taxa:Taxon)
+NOA_fin <- cbind(NOA_tax, size, voltinism, feed, resp, drift, saprobity, ph)
+
+write.table(df_NOA_fin, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_NOA.csv", sep = ",")
