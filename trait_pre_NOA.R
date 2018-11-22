@@ -1,5 +1,5 @@
 #### Preparation: North American database ####
-#---- Trait Information Preprocessing ----
+# ---- Trait Information Preprocessing ----
 
 # ------------------------------------------------------------------------------------------------------------------------- #
 #### Working directory ####
