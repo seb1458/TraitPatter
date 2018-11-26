@@ -1,22 +1,23 @@
 #### Preparation: Australia database ####
-#---- Trait Information Preprocessing ----
+# ---- Trait Information Preprocessing ----
 
+# ------------------------------------------------------------------------------------------------------------------------- #
 #### Working directory ####
 path <- "~/Schreibtisch/Thesis/data"
 
 
-
+# ------------------------------------------------------------------------------------------------------------------------- #
 #### Packages ####
 library(tidyverse)
 library(readxl)
 
 
-
+# ------------------------------------------------------------------------------------------------------------------------- #
 #### Load data ####
 df_AUS <- read.csv(file.path(path, "Australia", "macroinvertebrate_AUS_tax.csv"), stringsAsFactors = FALSE)
 
 
-
+# ------------------------------------------------------------------------------------------------------------------------- #
 #### Query traits to keep ####
 # Database Schäfer
 (names_shafer <- grep("shafer", names(df_AUS), ignore.case = TRUE, value = TRUE))
@@ -82,9 +83,9 @@ fin_AUS <- df_AUS %>%
          keep_maxwell)
 
 
-
+# ------------------------------------------------------------------------------------------------------------------------- #
 #### Format trait information ####
-# ---- Voltinism ---- #
+# ---- Voltinism ----
 # Explanation
 # 1. volt1: < 1 reproductive cycle per year
 # 2. volt2: = 1 reproductive cycle per year
@@ -132,7 +133,7 @@ voltinism <- voltinism %>%
   select(volt1:volt3)
 
 
-# ---- Reproduction ---- #
+# ---- Reproduction ----
 # Explanation
 # 1. rep1: aquatic eggs
 # 2. rep2: terrestrial eggs
@@ -172,7 +173,7 @@ reproduction <- reproduction %>%
   select(rep1:rep3)  
 
 
-# ---- Feeding ---- #
+# ---- Feeding ----
 # Explanation
 # 1. feed1: Collector-gatherer
 # 2. feed2: Collector-filterer
@@ -276,7 +277,7 @@ feeding <- feeding %>% select(feed1:feed6)
 # Missing: "Feeding_absorber_VicEPA", 
 
 
-# ---- Respiration ---- #
+# ---- Respiration ----
 # Explanation
 # 1. resp1: Tegument
 # 2. resp2: Gills
@@ -364,7 +365,7 @@ respiration <- respiration %>%
   select(resp1:resp5) 
 
 
-# ---- Dispersal ---- #
+# ---- Dispersal ----
 # Only (aquatic) drift data was summarised
 # 1. drift1: low
 # 2. drift2: medium
@@ -425,7 +426,7 @@ drift <- drift %>%
          drift3 = ifelse(is.na(drift3), drift3_maxwell.new, drift3)) %>%
   select(drift1:drift3)
 
-# ---- Substrate Relation ---- #
+# ---- Substrate Relation ----
 # Definition: Substrate relation OR attachment OR (micro)habitat
 # Only Botwe and VicEPA with data
 # Sprawler = Crawler (?) -> "Attach_crawl_VicEPA" becomes substrate3
@@ -458,7 +459,7 @@ substrate <- substrate %>%
   select(substrate1:substrate8)
 
 
-# ---- Salinity Preference ---- #
+# ---- Salinity Preference ----
 # Only Botwe and VicEPA with data
 # Modality "EC4_Maxwell" is missing in database
 
@@ -477,7 +478,7 @@ salinity <- salinity %>%
   select(salinity1:salinity4)
 
 
-# ---- pH Preference ---- #
+# ---- pH Preference ----
 # Only Chessman with data
 # Explanation (same levels as for Europe):
 # 1. ph1: Acidic (ph < 7)
@@ -498,7 +499,7 @@ ph <- ph %>%
 # Remove NAs? Or replace with 0?
 
 
-# ---- Temperature Preference ---- #
+# ---- Temperature Preference ----
 # Only Chessman and Botwe with data
 # Chessman with numeric data can be transformed to ranges. Botwe data is mostly eurytherm.
 # Ther1_botwe is excluded because of stenothermal AND eurythermal character
@@ -531,7 +532,7 @@ temperature <- temperature %>%
 # Remove NAs? Or replace with 0?
 
 
-# ---- Life Duration ---- #
+# ---- Life Duration ----
 # Only Botwe and VicEPA with data
 # Explanation:
 # 1. life1: < 1 month
@@ -549,12 +550,12 @@ life <- life %>%
          life2 = ifelse(is.na(life2) | life2 == "0", Total_lifespan_more_than_1y_VicEPA, life1)) %>%
   select(life1:life2)
 
-# ---- Size ---- #
+# ---- Size ----
 # Size in categories seems best option but problems with categories of VicEPA and Botwe
 # Shafer and GBR with specific size in mm
 
 
-# ---- Aquatic Stages ---- #
+# ---- Aquatic Stages ----
 # Only VicEPA with data on aquatic stages of taxa
 
 
@@ -562,7 +563,7 @@ life <- life %>%
 # are not included in any database!
 
 
-
+# ------------------------------------------------------------------------------------------------------------------------- #
 #### Combine all traits with names_AUS ####
 
 # --- Combine trait information and add join ID
