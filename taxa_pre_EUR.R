@@ -127,8 +127,8 @@ names(df_EUR)[grep(c("vco$|cod$|mod$|war$|eut$"), names(df_EUR))] <-
 
 
 # pH preference
-names(df_EUR)[grep(c("aci$|neu$|ind$"), names(df_EUR))] <- 
-  c("ph_ind", "ph_acidic", "ph_neutral_alk")
+names(df_EUR)[grep(c("aci$|neu$|ind.1$"), names(df_EUR))] <- 
+  c("ph_acidic", "ph_neutral_alk", "ph_ind")
 
 # Explanation:  ph_acidic:      acidic - pH < 7
 #               ph_neutral_alk: neutral to alkaline - ph = 7
@@ -250,7 +250,7 @@ names(df_EUR)[grep(c("egg.1|lar|nym|pup|adu"), names(df_EUR))] <-
 
 # Emergence period
 names(df_EUR)[grep(c("win|spr$|sum|aut"), names(df_EUR))] <- 
-  c("ermerge_winter", "emerge_spring", "emerge_summer", "emerge_autumn")
+  c("emerge_winter", "emerge_spring", "emerge_summer", "emerge_autumn")
 
 # Explanation:  emerge_winter:  emerging mainly in winter
 #               emerge_summer:  emerging mainly in summer
@@ -314,4 +314,4 @@ df_EUR <- cbind(df_EUR, EU_size)
 
 # ------------------------------------------------------------------------------------------------------------------------- #
 #### Write .csv ####
-write.table(df_EUR, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR.csv", sep = ",")
+write.table(df_EUR, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR_complete.csv", sep = ",")

@@ -1,6 +1,5 @@
-#------------------------------------#
-#--- Preparation: Europe database ---#
-#------------------------------------#
+#### Preparation: European Database  ####
+# ---- Trait Information Preprocessing ----
 
 # ------------------------------------------------------------------------------------------------------------------------- #
 #### Working directory ####
@@ -14,18 +13,18 @@ library(tidyverse)
 
 # ------------------------------------------------------------------------------------------------------------------------- #
 #### Load Data ####
-df_EUR <- read.csv(file.path(path, "Europe", "macroinvertebrate_EUR.csv"), stringsAsFactors = FALSE)
+df_EUR <- read.csv(file.path(path, "Europe", "macroinvertebrate_EUR_complete.csv"), stringsAsFactors = FALSE)
 
 
 # ------------------------------------------------------------------------------------------------------------------------- #
 #### Query Traits ####
 names(df_EUR)
 
-# ---- Voltinism ----
-# Levels = What???
+# Remove unnecessary columns
+df_EUR <- select(df_EUR, -(si.1:si.5))
 
 
-
-df_EUR <- mutate(df_EUR,
-                 oxy_normal = ifelse(df_EUR$xenosaprobic + df_EUR$oligosaprobic >= df_EUR$b.mesosaprobic + df_EUR$a.mesosaprobic + df_EUR$polysaprobic, 1, 0),
-                 oxy_low = ifelse(df_EUR$xenosaprobic + df_EUR$oligosaprobic <= df_EUR$b.mesosaprobic + df_EUR$a.mesosaprobic + df_EUR$polysaprobic, 1, 0))
+# ------------------------------------------------------------------------------------------------------------------------- #
+#### Final Table ####
+# Write .csv
+write.table(df_EUR, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR.csv", sep = ",")
