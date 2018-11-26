@@ -45,7 +45,8 @@ size <- mutate(df_NOA,
                  size_4 = ifelse(df_NOA$Measured_length > 10.0 & df_NOA$Measured_length <= 20.0, 1, 0),
                  size_5 = ifelse(df_NOA$Measured_length > 20.0 & df_NOA$Measured_length <= 40.0, 1, 0),
                  size_6 = ifelse(df_NOA$Measured_length > 40.0 & df_NOA$Measured_length <= 80.0, 1, 0),
-                 size_7 = ifelse(df_NOA$Measured_length > 80, 1, 0))
+                 size_7 = ifelse(df_NOA$Measured_length > 80, 1, 0)) %>%
+  select(size_1:size_7)
 
 
 # ---- Voltinism ----
@@ -54,7 +55,8 @@ levels(as.factor(df_NOA$Voltinism))
 voltinism <- mutate(df_NOA,
                  volt_1 = ifelse(df_NOA$Voltinism == "< 1 Generation per year", 1, 0),
                  volt_2 = ifelse(df_NOA$Voltinism == "1 Generation per year", 1, 0),
-                 volt_3 = ifelse(df_NOA$Voltinism == "> 1 Generation per year", 1, 0))
+                 volt_3 = ifelse(df_NOA$Voltinism == "> 1 Generation per year", 1, 0)) %>%
+  select(volt_1:volt_3)
 
 
 # ---- Aquatic Stages ----
@@ -63,19 +65,19 @@ voltinism <- mutate(df_NOA,
 
 # ---- Feed Mode ----
 # Feed mode "Absorber" is deleted from EUR
-# Feed mode "Collector gatherer" (NOA) is converted to "Deposit-feeder" (EUR) (Resh and Cardé 2009)
 
 levels(as.factor(df_NOA$Feed_mode_prim))
 
 feed <- mutate(df_NOA,
                  feed_abs = ifelse(df_NOA$Feed_mode_prim == "Absorber", 1, 0),
-                 feed_deposit = ifelse(df_NOA$Feed_mode_prim == "Collector-gatherer", 1, 0),
+                 feed_gatherer = ifelse(df_NOA$Feed_mode_prim == "Collector-gatherer", 1, 0),
                  feed_shredder = ifelse(df_NOA$Feed_mode_prim == "Shredder", 1, 0),
                  feed_scraper = ifelse(df_NOA$Feed_mode_prim == "Scraper/grazer", 1, 0),
                  feed_filter = ifelse(df_NOA$Feed_mode_prim == "Collector-filterer", 1, 0),
                  feed_piercer = ifelse(df_NOA$Feed_mode_prim == "Piercer herbivore", 1, 0),
                  feed_predator = ifelse(df_NOA$Feed_mode_prim == "Predator", 1, 0),
-                 feed_parasite = ifelse(df_NOA$Feed_mode_prim == "Parasite", 1, 0))
+                 feed_parasite = ifelse(df_NOA$Feed_mode_prim == "Parasite", 1, 0)) %>%
+  select(feed_abs:feed_parasite)
 
 
 # ---- Respiration ----
@@ -197,7 +199,7 @@ resp <- mutate(df_NOA,
                                                   "neritidae" , "odontoceridae" , "phryganeidae" , "rhyacophilidae" , "sericostomatidae" , 
                                                   "sialidae" , "simuliidae" , "sisyridae" , "valvatidae" , "viviparidae"), 1, 0),
                  
-                 resp_tegument = ifelse(Family %in% c("noteridae" , "chironomidae" , "planorbidae" , "tubificidae" , "acroloxidae" ,
+                 resp_tegument = ifelse(Family %in% c("noteridae", "chironomidae" , "planorbidae" , "tubificidae" , "acroloxidae" ,
                                                       "chaoboridae" , "lymnaeidae" , "physidae" , "uenoidae" , "sericostomatidae" , 
                                                       "rhyacophilidae" , "psychomyiidae" , "polycentropodidae" , "piscicolidae" , 
                                                       "phryganeidae" , "philopotamidae" , "naididae" , "molannidae" , "lumbriculidae" ,
@@ -205,13 +207,14 @@ resp <- mutate(df_NOA,
                                                       "hirudinidae" , "helicopsychidae" , "apataniidae" , "brachycentridae" , "dipseudopsidae" ,
                                                       "enchytraeidae" , "erpobdellidae" , "glossiphoniidae" , "glossosomatidae" , "haplotaxidae"), 1, 0),
                  
-                 resp_plastron = ifelse(Family %in% c("naucoridae"), 1, 0)
-)
+                 resp_plastron = ifelse(Family %in% c("naucoridae"), 1, 0))
+
 df_NOA$resp_hydro_vesicle <- 0
 
-df_NOA <- df_NOA %>%
+respiration <- df_NOA %>%
   mutate(resp_spiracle = ifelse(Resp_late == "Spiracular gills" , 1, 0),
-         resp_gill = ifelse(Resp_late == "Tracheal gills", 1, 0))
+         resp_gill = ifelse(Resp_late == "Tracheal gills", 1, 0)) %>%
+  select(resp_spiracle:resp_plastron)
 
 
 # ---- Drift ----
@@ -222,7 +225,8 @@ levels(as.factor(df_NOA$Drift_early))
 drift <- df_NOA %>%
   mutate(drift1 = ifelse(grepl("weak", Drift_early, ignore.case = TRUE), 1, 0),
          drift2 = ifelse(grepl("medium", Drift_early, ignore.case = TRUE), 1, 0),
-         drift3 = ifelse(grepl("sstrong", Drift_early, ignore.case = TRUE), 1, 0))
+         drift3 = ifelse(grepl("strong", Drift_early, ignore.case = TRUE), 1, 0)) %>%
+  select(drift1:drift3)
 
 
 # ---- Locomotion ----
@@ -256,19 +260,22 @@ saprobity <- select(df_NOA, O2_normal, O2_low)
 ph <- df_NOA %>%
   mutate(ph1 = pH_acidic,
          ph2 = pH_normal) %>%
-  mutate(ph2 = ifelse(is.na(ph2), pH_alkaline, ph2))
+  mutate(ph2 = ifelse(is.na(ph2), pH_alkaline, ph2)) %>%
+  select(ph1:ph2)
 
 
 # ---- Temperature preference ----
 levels(as.factor(df_NOA$Thermal_pref))
 
 
-# ---- Salinity Preference
+# ---- Salinity preference ----
 # Assigning levels via df_NOA$Salin_fresh, df_NOA$Salin_brakish, df_NOA$Salin_salt?
 
 # ------------------------------------------------------------------------------------------------------------------------- #
 #### Final table ####
 NOA_tax <- df_NOA %>% select(Taxa:Taxon)
-NOA_fin <- cbind(NOA_tax, size, voltinism, feed, resp, drift, saprobity, ph)
+NOA_fin <- cbind(NOA_tax, size, voltinism, feed, drift, saprobity, ph)
+# MISSING: Respiration, temperature preference, salinity preference, locomotion/substrate relation, aquatic stages, reproduction
 
-write.table(df_NOA_fin, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_NOA.csv", sep = ",")
+# Write .csv
+write.table(NOA_fin, file = "~/Schreibtisch/Thesis/data/North America/macroinvertebrate_NOA.csv", sep = ",")
