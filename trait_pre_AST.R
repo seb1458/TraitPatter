@@ -538,8 +538,7 @@ temperature <- temperature %>%
 # 1. life1: < 1 month
 # 3. life2: > 1 month
 
-life_names <- grepl("life", names(fin_AUS), ignore.case = TRUE)
-(life <- fin_AUS[life_names])
+(life <- fin_AUS[grepl("life", names(fin_AUS), ignore.case = TRUE)])
 
 life <- life %>%
   mutate(life1 = Life1_botwe, life2 = Life3_botwe) %>%
@@ -553,8 +552,42 @@ life <- life %>%
 # ---- Size ----
 # Size in categories seems best option but problems with categories of VicEPA and Botwe
 # Shafer and GBR with specific size in mm
+# Explanation:
+# size1: small (< 9 mm)
+# size2: medium (9 - 16 mm)
+# size3: large (> 16 mm)
 
+# NOTE: The categories for VicEPA where transformed differently. Up to 10 mm -> small, 10 - 20 mm -> medium, > 20 mm -> large
 
+# Transform Shafer data to categories
+fin_AUS <- fin_AUS %>%
+  mutate(size1_shafer = ifelse(Max_body_size_.mm._._number_Shafer > 0 & Max_body_size_.mm._._number_Shafer < 9, 1, 0),
+         size2_shafer = ifelse(Max_body_size_.mm._._number_Shafer >= 9 & Max_body_size_.mm._._number_Shafer <= 16, 1, 0),
+         size3_shafer = ifelse(Max_body_size_.mm._._number_Shafer < 16, 1, 0))
+
+# Transform Shafer data to categories
+fin_AUS <- fin_AUS %>%
+  mutate(size1_gbr = ifelse(Max_body_size_.mm._._number_bugs_gbr > 0 & Max_body_size_.mm._._number_bugs_gbr < 9, 1, 0),
+         size2_gbr = ifelse(Max_body_size_.mm._._number_bugs_gbr >= 9 & Max_body_size_.mm._._number_bugs_gbr <= 16, 1, 0),
+         size3_gbr = ifelse(Max_body_size_.mm._._number_bugs_gbr < 16, 1, 0))
+
+(size <- fin_AUS[grepl("size", names(fin_AUS), ignore.case = TRUE)])
+size <- select(size, -(Max_body_size_.mm._._number_Shafer:Max_body_size_.mm._._number_bugs_gbr))
+
+size <- size %>%
+  mutate(size1 = Size1_botwe, size2 = Size2_botwe, size3 = Size3_botwe) %>%
+  mutate(size1 = ifelse(is.na(size1) | size1 == 0, Max_size_less_than_5_VicEPA, size1),
+         size1 = ifelse(is.na(size1) | size1 == 0, Max_size_less_than_5_VicEPA, size1),
+         size1 = ifelse(is.na(size1) | size1 == 0, size1_shafer, size1),
+         size1 = ifelse(is.na(size1) | size1 == 0, size1_gbr, size1)) %>%
+  mutate(size2 = ifelse(is.na(size2) | size2 == 0, Max_size_10_to_20_VicEPA, size2),
+         size2 = ifelse(is.na(size2) | size2 == 0, size2_shafer, size2),
+         size2 = ifelse(is.na(size2) | size2 == 0, size2_gbr, size2)) %>%
+  mutate(size3 = ifelse(is.na(size3) | size3 == 0, Max_size_20_to_40_VicEPA, size3),
+         size3 = ifelse(is.na(size3) | size3 == 0, Max_size_more_than_40_VicEPA, size3),
+         size3 = ifelse(is.na(size3) | size3 == 0, size3_shafer, size3),
+         size3 = ifelse(is.na(size3) | size3 == 0, size3_gbr, size3))
+  
 # ---- Aquatic Stages ----
 # Only VicEPA with data on aquatic stages of taxa
 
