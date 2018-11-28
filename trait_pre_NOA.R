@@ -21,15 +21,10 @@ names(df_NOA)
 #### Query traits to keep ####
 
 # ---- Size ----
-# Trait 'Measured_length' is converted to the size classes of the European database.
-# Classes in EUR database:
-# size1: ≤ .25 cm 
-# size2: > .25-.5 cm
-# size3: > .5-1 cm
-# size4: > 1-2 cm
-# size5: > 2-4 cm
-# size6: > 4-8 cm
-# size7: > 8 cm
+# Trait 'Measured_length' is converted to the following size classes:
+# size1: small (< 9 mm) 
+# size2: medium (9-16 mm)
+# size3: large (> 16 mm)
 
 # Blank cells in Measured_length are replaced with zeroes
 # Commas are replaced by points 
@@ -38,15 +33,11 @@ df_NOA$Measured_length[df_NOA$Measured_length == ""] <- 0
 df_NOA$Measured_length <- sub(",",".", df_NOA$Measured_length)
 df_NOA[, "Measured_length"] <- as.numeric(df_NOA[, "Measured_length"])
 
-size <- mutate(df_NOA,
-                 size_1 = ifelse(df_NOA$Measured_length > 0 & df_NOA$Measured_length <= 2.5, 1, 0),
-                 size_2 = ifelse(df_NOA$Measured_length > 2.5 & df_NOA$Measured_length <= 5.0, 1, 0),
-                 size_3 = ifelse(df_NOA$Measured_length > 5.0 & df_NOA$Measured_length <= 10.0, 1, 0),
-                 size_4 = ifelse(df_NOA$Measured_length > 10.0 & df_NOA$Measured_length <= 20.0, 1, 0),
-                 size_5 = ifelse(df_NOA$Measured_length > 20.0 & df_NOA$Measured_length <= 40.0, 1, 0),
-                 size_6 = ifelse(df_NOA$Measured_length > 40.0 & df_NOA$Measured_length <= 80.0, 1, 0),
-                 size_7 = ifelse(df_NOA$Measured_length > 80, 1, 0)) %>%
-  select(size_1:size_7)
+size <- df_NOA %>%
+  mutate(size1 = ifelse(df_NOA$Measured_length > 0 & df_NOA$Measured_length < 9, 1, 0),
+         size2 = ifelse(df_NOA$Measured_length >= 9 & df_NOA$Measured_length <= 16, 1, 0),
+         size3 = ifelse(df_NOA$Measured_length > 16, 1, 0)) %>%
+  select(size1:size3)
 
 
 # ---- Voltinism ----
