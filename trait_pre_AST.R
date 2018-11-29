@@ -72,6 +72,12 @@ keep_maxwell <- c(grep("EC|repro|resp|volt|disp|C_Maxwell|P_Maxwell|SH|C,SH|SC|P
                        names_maxwell, value = TRUE))
 # Keep: Salinity preference, reproduction, respiration, voltinism, dispersal, feeding group
 
+
+# Database Marchant
+(names_marchant <- grep("marchant", names(df_AUS), ignore.case = TRUE, value = TRUE))
+
+keep_marchant <- names_marchant
+
 # Final columns to keep
 fin_AUS <- df_AUS %>%
   select(id_join,
@@ -80,7 +86,8 @@ fin_AUS <- df_AUS %>%
          keep_vicepa,
          keep_chessman,
          keep_bowte,
-         keep_maxwell)
+         keep_maxwell,
+         keep_marchant)
 
 
 # ------------------------------------------------------------------------------------------------------------------------- #
@@ -96,14 +103,14 @@ fin_AUS <- df_AUS %>%
 # E.g. number of generations per year = 0.5-1 translates to 1 generation per year (modality: volt2)
 fin_AUS <- fin_AUS %>%
   mutate(volt2_shafer = ifelse(grepl("1$", df_AUS$Number_of_generations_per_year_Shafer), 1, 0),
-         volt3_shafer = ifelse(!grepl("1$", df_AUS$Number_of_generations_per_year_Shafer) | !is.na(df_AUS$Number_of_generations_per_year_Shafer), 1, 0))
+         volt3_shafer = ifelse(!grepl("1$", df_AUS$Number_of_generations_per_year_Shafer) & !is.na(df_AUS$Number_of_generations_per_year_Shafer), 1, 0))
 # No species with voltinism < 1 
 # "1$|NA" anything else besides 0.5-1, 1 and NA
 
 fin_AUS <- fin_AUS %>%
   mutate(volt1_gbr = ifelse(grepl("5$", df_AUS$Number_of_generations_per_year_bugs_gbr), 1, 0),
          volt2_gbr = ifelse(grepl("0.5-1|<=|^1$", df_AUS$Number_of_generations_per_year_bugs_gbr), 1, 0),
-         volt3_gbr = ifelse(!grepl("5$|0.5-1|<=|^1$", df_AUS$Number_of_generations_per_year_bugs_gbr) | !is.na(df_AUS$Number_of_generations_per_year_bugs_gbr), 1, 0))
+         volt3_gbr = ifelse(!grepl("5$|0.5-1|<=|^1$", df_AUS$Number_of_generations_per_year_bugs_gbr) & !is.na(df_AUS$Number_of_generations_per_year_bugs_gbr), 1, 0))
 
 
 # Starting with the data from Botwe, and adding more information from the other databases
@@ -113,9 +120,10 @@ fin_AUS <- fin_AUS %>%
 
 (volt_names <- grep("volt", names(fin_AUS), value = TRUE, ignore.case = TRUE))
 
-voltinism <- fin_AUS %>% select(volt_names)
+voltinism <- select(fin_AUS, volt_names)
 
 voltinism <- voltinism %>%
+  na_if(0) %>%
   mutate(volt1 = Volt1_botwe, volt2 = Volt2_botwe, volt3 = Volt3_botwe) %>%
   mutate(volt1 = ifelse(is.na(volt1), volt1_Maxwell, volt1),
          volt2 = ifelse(is.na(volt3), volt2_Maxwell, volt2),
@@ -130,7 +138,8 @@ voltinism <- voltinism %>%
   mutate(volt1 = ifelse(is.na(volt1), volt1_gbr, volt1),
          volt2 = ifelse(is.na(volt2), volt2_gbr, volt2),
          volt3 = ifelse(is.na(volt3), volt3_gbr, volt3)) %>%
-  select(volt1:volt3)
+  select(volt1:volt3) %>%
+  mutate_all(funs(ifelse(is.na(.), 0, .)))
 
 
 # ---- Reproduction ----
@@ -157,9 +166,10 @@ fin_AUS <- fin_AUS %>%
 
 (rep_names <- grep("rep", names(fin_AUS), value = TRUE, ignore.case = TRUE))
 
-reproduction <- fin_AUS %>% select(rep_names)
+reproduction <- select(fin_AUS, rep_names)
 
 reproduction <- reproduction %>%
+  na_if(0) %>%
   mutate(rep1 = Rep1_botwe, rep2 = Rep2_botwe, rep3 = Rep3_botwe) %>%
   mutate(rep1 = ifelse(is.na(rep1), repro1_Maxwell, rep1),
          rep2 = ifelse(is.na(rep2), repro2_Maxwell, rep2),
@@ -170,17 +180,18 @@ reproduction <- reproduction %>%
   mutate(rep1 = ifelse(is.na(rep1), rep1_gbr, rep1),
          rep2 = ifelse(is.na(rep2), rep2_gbr, rep2),
          rep3 = ifelse(is.na(rep3), rep3_gbr, rep3)) %>%
-  select(rep1:rep3)  
+  select(rep1:rep3) %>%
+  mutate_all(funs(ifelse(is.na(.), 0, .)))
 
 
-# ---- Feeding ----
+# ---- Feed Mode ----
 # Explanation
-# 1. feed1: Collector-gatherer
-# 2. feed2: Collector-filterer
-# 3. feed3: Herbivor (scraper, shredder, piercer)
-# 4. feed4: Predator (piercer, engulfer)
-# 5. feed5: Shredder (detritivore)
-# 6. feed6: Parasite
+# 1. feed_gatherer: Collector-gatherer
+# 2. feed_filter: Collector-filterer
+# 3. feed_herbivor: Herbivor (scraper, shredder, piercer)
+# 4. feed_predator: Predator (piercer, engulfer)
+# 5. feed_shredder: Shredder (detritivore)
+# 6. feed_parasite: Parasite
 
 # Transforming Shafer, GBR and Maxwell data to described modalities 
 
@@ -220,58 +231,65 @@ fin_AUS <- fin_AUS %>%
 fin_AUS$feed1_maxwell <- ifelse(grepl("0", fin_AUS$feed1_maxwell) | is.na(fin_AUS$feed1_maxwell), fin_AUS$C.SH_Maxwell, fin_AUS$feed1_maxwell)
 fin_AUS$feed1_maxwell <- ifelse(grepl("0", fin_AUS$feed1_maxwell) | is.na(fin_AUS$feed1_maxwell), fin_AUS$C.SC_Maxwell, fin_AUS$feed1_maxwell)
 
-(feed_names <- grep("feed|trop", names(fin_AUS), value = TRUE, ignore.case = TRUE))
+(feed_names <- grep("feed|trop|marchant", names(fin_AUS), value = TRUE, ignore.case = TRUE))
 
-feeding <- fin_AUS %>% select(feed_names)
-
-feeding <- feeding %>% select(-c(grep("ref", names(feeding), value = TRUE, ignore.case = TRUE)))
+feeding <- select(fin_AUS, feed_names)
 
 feeding <- feeding %>%
-  mutate(feed1 = Trop1_botwe, feed2 = Trop2_botwe, feed3 = Trop3_botwe, feed4 = Trop4_botwe,
-         feed5 = Trop1_botwe, feed5 = Trop5_botwe, feed6 = feed6_maxwell) %>%
-  mutate(feed1 = ifelse(is.na(feed1), feed1_maxwell, feed1),
-         feed2 = ifelse(is.na(feed2), feed2_maxwell, feed2),
-         feed3 = ifelse(is.na(feed3), feed3_maxwell, feed3),
-         feed4 = ifelse(is.na(feed4), feed4_maxwell, feed4),
-         feed5 = ifelse(is.na(feed5), feed5_maxwell, feed5)) %>%
-  mutate(feed1 = ifelse(is.na(feed1), Feeding_filterers_VicEPA, feed1),
-         feed2 = ifelse(is.na(feed2), Feeding_deposit_grazer_VicEPA, feed2),
-         feed3 = ifelse(is.na(feed3), Feeding_scrapers_VicEPA, feed3),
-         feed4 = ifelse(is.na(feed4), Feeding_predators_VicEPA, feed4),
-         feed5 = ifelse(is.na(feed5), Feeding_shredders_VicEPA, feed5),
-         feed6 = ifelse(is.na(feed6), Feeding_parasite_VicEPA, feed6)) %>%
-  mutate(feed1 = ifelse(is.na(feed1), Filterer_.proportion_of_feeding._fam_Chessman2017, feed1),
-         feed2 = ifelse(is.na(feed2), Gatherer_.proportion_of_feeding._fam_Chessman2017, feed2),
-         feed3 = ifelse(is.na(feed3), Scraper_.proportion_of_feeding._fam_Chessman2017, feed3),
-         feed4 = ifelse(is.na(feed4), Predator_.proportion_of_feeding._fam_Chessman2017, feed4),
-         feed5 = ifelse(is.na(feed5), Shredder_.proportion_of_feeding._fam_Chessman2017, feed5)) %>%
-  mutate(feed1 = ifelse(is.na(feed1), Filterer..proportion.of.feeding._genus_Chessman2017, feed1),
-         feed2 = ifelse(is.na(feed2), Gatherer..proportion.of.feeding._genus_Chessman2017, feed2),
-         feed3 = ifelse(is.na(feed3), Scraper..proportion.of.feeding._genus_Chessman2017, feed3),
-         feed4 = ifelse(is.na(feed4), Predator..proportion.of.feeding._genus_Chessman2017, feed4),
-         feed5 = ifelse(is.na(feed5), Shredder..proportion.of.feeding._genus_Chessman2017, feed5)) %>%
-  mutate(feed1 = ifelse(is.na(feed3), feed3_shafer, feed3),
-         feed2 = ifelse(is.na(feed4), feed4_shafer, feed4),
-         feed3 = ifelse(is.na(feed5), feed5_shafer, feed5),
-         feed4 = ifelse(is.na(feed6), feed6_shafer, feed6)) %>%
-  mutate(feed1 = ifelse(is.na(feed3), feed3_gbr, feed3),
-         feed2 = ifelse(is.na(feed4), feed4_gbr, feed4),
-         feed3 = ifelse(is.na(feed5), feed5_gbr, feed5),
-         feed4 = ifelse(is.na(feed6), feed6_gbr, feed6))  
+  na_if(0) %>%
+  mutate(feed_gatherer = Trop1_botwe, feed_filter = Trop2_botwe, feed_herbivore = Trop3_botwe,
+         feed_predator = Trop4_botwe, feed_shredder = Trop5_botwe, feed_parasite = feed6_maxwell) %>%
+  mutate(feed_gatherer = ifelse(is.na(feed_gatherer), feed1_maxwell, feed_gatherer),
+         feed_filter = ifelse(is.na(feed_filter), feed2_maxwell, feed_filter),
+         feed_herbivore = ifelse(is.na(feed_herbivore), feed3_maxwell, feed_herbivore),
+         feed_predator = ifelse(is.na(feed_predator), feed4_maxwell, feed_predator),
+         feed_shredder = ifelse(is.na(feed_shredder), feed5_maxwell, feed_shredder)) %>%
+  mutate(feed_gatherer = ifelse(is.na(feed_gatherer), Feeding_filterers_VicEPA, feed_gatherer),
+         feed_filter = ifelse(is.na(feed_filter), Feeding_deposit_grazer_VicEPA, feed_filter),
+         feed_herbivore = ifelse(is.na(feed_herbivore), Feeding_scrapers_VicEPA, feed_herbivore),
+         feed_predator = ifelse(is.na(feed_predator), Feeding_predators_VicEPA, feed_predator),
+         feed_shredder = ifelse(is.na(feed_shredder), Feeding_shredders_VicEPA, feed_shredder),
+         feed_parasite = ifelse(is.na(feed_parasite), Feeding_parasite_VicEPA, feed_parasite)) %>%
+  mutate(feed_gatherer = ifelse(is.na(feed_gatherer), Filterer_.proportion_of_feeding._fam_Chessman2017, feed_gatherer),
+         feed_filter = ifelse(is.na(feed_filter), Gatherer_.proportion_of_feeding._fam_Chessman2017, feed_filter),
+         feed_herbivore = ifelse(is.na(feed_herbivore), Scraper_.proportion_of_feeding._fam_Chessman2017, feed_herbivore),
+         feed_predator = ifelse(is.na(feed_predator), Predator_.proportion_of_feeding._fam_Chessman2017, feed_predator),
+         feed_shredder = ifelse(is.na(feed_shredder), Shredder_.proportion_of_feeding._fam_Chessman2017, feed_shredder)) %>%
+  mutate(feed_gatherer = ifelse(is.na(feed_gatherer), Filterer..proportion.of.feeding._genus_Chessman2017, feed_gatherer),
+         feed_filter = ifelse(is.na(feed_filter), Gatherer..proportion.of.feeding._genus_Chessman2017, feed_filter),
+         feed_herbivore = ifelse(is.na(feed_herbivore), Scraper..proportion.of.feeding._genus_Chessman2017, feed_herbivore),
+         feed_predator = ifelse(is.na(feed_predator), Predator..proportion.of.feeding._genus_Chessman2017, feed_predator),
+         feed_shredder = ifelse(is.na(feed_shredder), Shredder..proportion.of.feeding._genus_Chessman2017, feed_shredder)) %>%
+  mutate(feed_herbivore = ifelse(is.na(feed_herbivore), feed3_shafer, feed_herbivore),
+         feed_predator = ifelse(is.na(feed_predator), feed4_shafer, feed_predator),
+         feed_shredder = ifelse(is.na(feed_shredder), feed5_shafer, feed_shredder),
+         feed_parasite = ifelse(is.na(feed_parasite), feed6_shafer, feed_parasite)) %>%
+  mutate(feed_herbivore = ifelse(is.na(feed_herbivore), feed3_gbr, feed_herbivore),
+         feed_predator = ifelse(is.na(feed_predator), feed4_gbr, feed_predator),
+         feed_shredder = ifelse(is.na(feed_shredder), feed5_gbr, feed_shredder),
+         feed_parasite = ifelse(is.na(feed_parasite), feed6_gbr, feed_parasite)) %>%
+  mutate(feed_shredder = ifelse(is.na(feed_shredder), shredder_Marchant, feed_shredder),
+         feed_gatherer = ifelse(is.na(feed_gatherer), detritivore_Marchant, feed_gatherer),
+         feed_filter = ifelse(is.na(feed_filter), filterer_Marchant, feed_filter),
+         feed_herbivore = ifelse(is.na(feed_herbivore), grazer_Marchant, feed_herbivore),
+         feed_predator = ifelse(is.na(feed_predator), predator_Marchant, feed_predator))
+  
 
 
 # Last changes
 # 1. Assign missing piercer-group of VicEPA to feed3
-feeding$feed3 <- ifelse(grepl("0", feeding$feed3), feeding$Feeding_piercers_VicEPA, feeding$feed3)
+feeding$feed_herbivore <- ifelse(grepl("0", feeding$feed_herbivore), feeding$Feeding_piercers_VicEPA, feeding$feed_herbivore)
 
 # 2. Change Chessman values (0.25, 0.3333, 0.5) to 1
-replace <- c("0.2", "0.25", "0.333333333333333", "0.5")
+replace <- c(0.2, 0.25, 0.333333333333333, 0.5)
 for (i in seq_along(feeding)) {
   feeding[[i]][feeding[[i]] %in% replace] <- 1
 }
 feeding %>% mutate_all(as.factor) %>% sapply(levels)
 
-feeding <- feeding %>% select(feed1:feed6)
+feeding <- feeding %>%
+  select(feed_gatherer:feed_parasite) %>%
+  mutate_all(funs(ifelse(is.na(.), 0, .)))
 
 # Note: All shredder modalities were assigned to feed3 (hebivor)
 # Missing: "Feeding_absorber_VicEPA", 
@@ -279,11 +297,11 @@ feeding <- feeding %>% select(feed1:feed6)
 
 # ---- Respiration ----
 # Explanation
-# 1. resp1: Tegument
-# 2. resp2: Gills
-# 3. resp3: Plastron
-# 4. resp4: Air/Atmospheric
-# 5. resp5: Spiracle
+# 1. resp_tegument: Tegument
+# 2. resp_gills: Gills
+# 3. resp_plastron: Plastron
+# 4. resp_atmospheric: Air/Atmospheric
+# 5. resp_spiracle: Spiracle
 
 # --- Shafer
 # Shafer contains "pneumostome" (2 times) which is the respiratory system for (land)snails. Keep as new modality or dismiss?
@@ -342,34 +360,36 @@ fin_AUS <- fin_AUS %>%
 respiration <- fin_AUS %>% select(resp_names)
 
 respiration <- respiration %>%
-  mutate(resp1 = Resp1_botwe, resp2 = Resp2_botwe, resp3 = Resp3_botwe,
-         resp4 = resp4_maxwell.new, resp5 = resp5_maxwell.new) %>%
-  mutate(resp1 = ifelse(is.na(resp1), resp1_maxwell.new, resp1),
-         resp2 = ifelse(is.na(resp2), resp2_maxwell.new, resp2),
-         resp3 = ifelse(is.na(resp3), resp3_maxwell.new, resp3)) %>%
-  mutate(resp1 = ifelse(is.na(resp1), resp1_vicepa.new, resp1),
-         resp2 = ifelse(is.na(resp2), resp2_vicepa.new, resp2),
-         resp3 = ifelse(is.na(resp3), resp3_vicepa.new, resp3),
-         resp5 = ifelse(is.na(resp5), resp5_vicepa.new, resp5)) %>%
-  mutate(resp2 = ifelse(is.na(resp2), resp2_chessman.new, resp2),
-         resp4 = ifelse(is.na(resp4), resp4_chessman.new, resp4),
-         resp5 = ifelse(is.na(resp5), resp5_chessman.new, resp5)) %>%
-  mutate(resp1 = ifelse(is.na(resp1), resp1_shafer.new, resp1),
-         resp2 = ifelse(is.na(resp2), resp2_shafer.new, resp2),
-         resp3 = ifelse(is.na(resp3), resp3_shafer.new, resp3),
-         resp4 = ifelse(is.na(resp4), resp4_shafer.new, resp4)) %>%
-  mutate(resp1 = ifelse(is.na(resp1), resp1_gbr.new, resp1),
-         resp2 = ifelse(is.na(resp2), resp2_gbr.new, resp2),
-         resp3 = ifelse(is.na(resp3), resp3_gbr.new, resp3),
-         resp4 = ifelse(is.na(resp4), resp4_gbr.new, resp4)) %>%
-  select(resp1:resp5) 
+  na_if(0) %>%
+  mutate(resp_tegument = Resp1_botwe, resp_gills = Resp2_botwe, resp_plastron = Resp3_botwe,
+         resp_atmospheric = resp4_maxwell.new, resp_spiracle = resp5_maxwell.new) %>%
+  mutate(resp_tegument = ifelse(is.na(resp_tegument), resp1_maxwell.new, resp_tegument),
+         resp_gills = ifelse(is.na(resp_gills), resp2_maxwell.new, resp_gills),
+         resp_plastron = ifelse(is.na(resp_plastron), resp3_maxwell.new, resp_plastron)) %>%
+  mutate(resp_tegument = ifelse(is.na(resp_tegument), resp1_vicepa.new, resp_tegument),
+         resp_gills = ifelse(is.na(resp_gills), resp2_vicepa.new, resp_gills),
+         resp_plastron = ifelse(is.na(resp_plastron), resp3_vicepa.new, resp_plastron),
+         resp_spiracle = ifelse(is.na(resp_spiracle), resp5_vicepa.new, resp_spiracle)) %>%
+  mutate(resp_gills = ifelse(is.na(resp_gills), resp2_chessman.new, resp_gills),
+         resp_atmospheric = ifelse(is.na(resp_atmospheric), resp4_chessman.new, resp_atmospheric),
+         resp_spiracle = ifelse(is.na(resp_spiracle), resp5_chessman.new, resp_spiracle)) %>%
+  mutate(resp_tegument = ifelse(is.na(resp_tegument), resp1_shafer.new, resp_tegument),
+         resp_gills = ifelse(is.na(resp_gills), resp2_shafer.new, resp_gills),
+         resp_plastron = ifelse(is.na(resp_plastron), resp3_shafer.new, resp_plastron),
+         resp_atmospheric = ifelse(is.na(resp_atmospheric), resp4_shafer.new, resp_atmospheric)) %>%
+  mutate(resp_tegument = ifelse(is.na(resp_tegument), resp1_gbr.new, resp_tegument),
+         resp_gills = ifelse(is.na(resp_gills), resp2_gbr.new, resp_gills),
+         resp_plastron = ifelse(is.na(resp_plastron), resp3_gbr.new, resp_plastron),
+         resp_atmospheric = ifelse(is.na(resp_atmospheric), resp4_gbr.new, resp_atmospheric)) %>%
+  select(resp_tegument:resp_spiracle) %>%
+  mutate_all(funs(ifelse(is.na(.), 0, .)))
 
 
 # ---- Dispersal ----
 # Only (aquatic) drift data was summarised
-# 1. drift1: low
-# 2. drift2: medium
-# 3. drift3: high
+# 1. drift_low: low
+# 2. drift_medium: medium
+# 3. drift_high: high
 # NOTE: Maybe a combined mobility trait would make sense
 
 # --- VicEPA
@@ -414,75 +434,81 @@ fin_AUS <- fin_AUS %>%
 drift <- fin_AUS[drift_names]
 
 drift <- drift %>%
-  mutate(drift1 = drift1_botwe.new, drift2 = drift2_botwe.new, drift3 = drift3_botwe.new) %>%
-  mutate(drift1 = ifelse(is.na(drift1), drift1_vicepa.new, drift1),
-         drift2 = ifelse(is.na(drift2), drift2_vicepa.new, drift2),
-         drift3 = ifelse(is.na(drift3), drift3_vicepa.new, drift3)) %>%
-  mutate(drift1 = ifelse(is.na(drift1), drift1_shafer.new, drift1),
-         drift3 = ifelse(is.na(drift3), drift3_shafer.new, drift3)) %>%
-  mutate(drift2 = ifelse(is.na(drift2), drift2_gbr.new, drift2),
-         drift3 = ifelse(is.na(drift3), drift3_gbr.new, drift3)) %>%
-  mutate(drift1 = ifelse(is.na(drift1), drift1_maxwell.new, drift1),
-         drift3 = ifelse(is.na(drift3), drift3_maxwell.new, drift3)) %>%
-  select(drift1:drift3)
+  na_if(0) %>%
+  mutate(drift_low = drift1_botwe.new, drift_medium = drift2_botwe.new, drift_high = drift3_botwe.new) %>%
+  mutate(drift_low = ifelse(is.na(drift_low), drift1_vicepa.new, drift_low),
+         drift_medium = ifelse(is.na(drift_medium), drift2_vicepa.new, drift_medium),
+         drift_high = ifelse(is.na(drift_high), drift3_vicepa.new, drift_high)) %>%
+  mutate(drift_low = ifelse(is.na(drift_low), drift1_shafer.new, drift_low),
+         drift_high = ifelse(is.na(drift_high), drift3_shafer.new, drift_high)) %>%
+  mutate(drift_medium = ifelse(is.na(drift_medium), drift2_gbr.new, drift_medium),
+         drift_high = ifelse(is.na(drift_high), drift3_gbr.new, drift_high)) %>%
+  mutate(drift_low = ifelse(is.na(drift_low), drift1_maxwell.new, drift_low),
+         drift_high = ifelse(is.na(drift_high), drift3_maxwell.new, drift_high)) %>%
+  select(drift_low:drift_high) %>%
+  mutate_all(funs(ifelse(is.na(.), 0, .)))
 
+  
 # ---- Substrate Relation ----
 # Definition: Substrate relation OR attachment OR (micro)habitat
 # Only Botwe and VicEPA with data
 # Sprawler = Crawler (?) -> "Attach_crawl_VicEPA" becomes substrate3
 # Explanation:
-# 1. substrate1: Burrow
-# 2. substrate2: Climb
-# 3. substrate3: Sprawl
-# 4. substrate4: Cling
-# 5. substrate5: Swim
-# 6. substrate6: Skate
-# 7. substrate7: Attached (temporary)
-# 8. substrate8: Attached (permanent)
+# 1. sub_burrow: Burrow
+# 2. sub_climb: Climb
+# 3. sub_sprawl: Sprawl
+# 4. sub_cling: Cling
+# 5. sub_swim: Swim
+# 6. sub_skate: Skate
+# 7. sub_attached_temp: Attached (temporary)
+# 8. sub_attached_perm: Attached (permanent)
 
 sub_names <- grepl("habi", names(fin_AUS), ignore.case = TRUE) | grepl("attach", names(fin_AUS), ignore.case = TRUE)
 
 substrate <- fin_AUS[sub_names]
 
 substrate <- substrate %>%
-  mutate(substrate1 = Habi1_botwe,
-         substrate2 = Habi2_botwe,
-         substrate3 = Habi3_botwe,
-         substrate4 = Habi4_botwe,
-         substrate5 = Habi5_botwe,
-         substrate6 = Habi6_botwe,
-         substrate7 = Attach_temp_VicEPA,
-         substrate8 = Attach_perm_VicEPA) %>%
-  mutate(substrate5 = ifelse(is.na(substrate5), Attach_swim_VicEPA, substrate5),
-         substrate1 = ifelse(is.na(substrate1), Attach_burrow_VicEPA, substrate1),
-         substrate3 = ifelse(is.na(substrate3), Attach_crawl_VicEPA, substrate3)) %>%
-  select(substrate1:substrate8)
+  na_if(0) %>%
+  mutate(sub_burrow = Habi1_botwe,
+         sub_climb = Habi2_botwe,
+         sub_sprawl = Habi3_botwe,
+         sub_cling = Habi4_botwe,
+         sub_swim = Habi5_botwe,
+         sub_skate = Habi6_botwe,
+         sub_attached_temp = Attach_temp_VicEPA,
+         sub_attached_perm = Attach_perm_VicEPA) %>%
+  mutate(sub_swim = ifelse(is.na(sub_swim), Attach_swim_VicEPA, sub_swim),
+         sub_burrow = ifelse(is.na(sub_burrow), Attach_burrow_VicEPA, sub_burrow),
+         sub_sprawl = ifelse(is.na(sub_sprawl), Attach_crawl_VicEPA, sub_sprawl)) %>%
+  select(sub_burrow:sub_attached_perm) %>%
+  mutate_all(funs(ifelse(is.na(.), 0, .)))
 
 
 # ---- Salinity Preference ----
 # Only Botwe and VicEPA with data
 # Modality "EC4_Maxwell" is missing in database
+# Also: Not salinity preference rather than salinity sensitivity
 
-sal_names <- grepl("^sal", names(fin_AUS), ignore.case = TRUE) | grepl("^EC", names(fin_AUS), ignore.case = TRUE)
-
-salinity <- fin_AUS[sal_names]
-
-salinity <- salinity %>%
-  mutate(salinity1 = Sal1_botwe,
-         salinity2 = Sal2_botwe,
-         salinity3 = Sal3_botwe,
-         salinity4 = Sal4_botwe) %>%
-  mutate(salinity1 = ifelse(is.na(salinity1), EC1_Maxwell, salinity1),
-         salinity2 = ifelse(is.na(salinity2), EC2_Maxwell, salinity2),
-         salinity3 = ifelse(is.na(salinity3), EC3_Maxwell, salinity3)) %>%
-  select(salinity1:salinity4)
+# sal_names <- grepl("^sal", names(fin_AUS), ignore.case = TRUE) | grepl("^EC", names(fin_AUS), ignore.case = TRUE)
+# 
+# salinity <- fin_AUS[sal_names]
+# 
+# salinity <- salinity %>%
+#   mutate(salinity1 = Sal1_botwe,
+#          salinity2 = Sal2_botwe,
+#          salinity3 = Sal3_botwe,
+#          salinity4 = Sal4_botwe) %>%
+#   mutate(salinity1 = ifelse(is.na(salinity1), EC1_Maxwell, salinity1),
+#          salinity2 = ifelse(is.na(salinity2), EC2_Maxwell, salinity2),
+#          salinity3 = ifelse(is.na(salinity3), EC3_Maxwell, salinity3)) %>%
+#   select(salinity1:salinity4)
 
 
 # ---- pH Preference ----
 # Only Chessman with data
 # Explanation (same levels as for Europe):
 # 1. ph1: Acidic (ph < 7)
-# 2. ph2: Neutral to alkaline (ph >= 7)
+# 2. ph_neut_alk: Neutral to alkaline (ph >= 7)
 
 ph_names <- grepl("^ph", names(fin_AUS), ignore.case = TRUE)
 (ph <- fin_AUS[ph_names])
@@ -492,11 +518,11 @@ ph <- transform(ph, ph = as.numeric(pH_minimum_fam_Chessman2017)) %>%
   select(ph)
 
 ph <- ph %>%
-  mutate(ph1 = ifelse(ph < 7, 1, 0),
-         ph2 = ifelse(ph >= 7, 1, 0)) %>%
-  select(ph1, ph2)
-
-# Remove NAs? Or replace with 0?
+  na_if(0) %>%
+  mutate(ph_acidic = ifelse(ph < 7, 1, 0),
+         ph_neut_alk = ifelse(ph >= 7, 1, 0)) %>%
+  select(ph_acidic, ph_neut_alk) %>%
+  mutate_all(funs(ifelse(is.na(.), 0, .)))
 
 
 # ---- Temperature Preference ----
@@ -505,11 +531,11 @@ ph <- ph %>%
 # Ther1_botwe is excluded because of stenothermal AND eurythermal character
 
 # Explanation (same levels as for Europe):  
-# temp1: very cold (< 6 °C)
-# temp2: cold (>=6 °C & < 10 °C)
-# temp3: moderate (>=10 °C & < 18 °C)
-# temp4: warm (> 18 °C)
-# temp5: eurytherm (no specifice preference)
+# temp_very_cold: very cold (< 6 °C)
+# temp_cold: cold (>=6 °C & < 10 °C)
+# temp_mod: moderate (>=10 °C & < 18 °C)
+# temp_warm: warm (> 18 °C)
+# temp_eurytherm: eurytherm (no specifice preference)
 
 
 temp_names <- grepl("^ther", names(fin_AUS), ignore.case = TRUE)
@@ -520,42 +546,45 @@ temperature <- transform(temperature, temperature = as.numeric(Thermophily_Chess
   select(Ther1_botwe:Ther3_botwe, temperature)
 
 temperature <- temperature %>%
-  mutate(temp1 = ifelse(temperature < 6, 1, 0),
-         temp2 = ifelse(temperature >= 6 & temperature < 10, 1, 0),
-         temp3 = ifelse(temperature >= 10 & temperature < 18, 1, 0),
-         temp4 = ifelse(temperature > 18, 1, 0),
-         temp5 = NA) %>%
-  mutate(temp5 = ifelse(is.na(temp5), Ther2_botwe, temp5), 
-         temp5 = ifelse(is.na(temp5), Ther3_botwe, temp5)) %>%
-  select(temp1:temp5)
-
-# Remove NAs? Or replace with 0?
+  na_if(0) %>%
+  mutate(temp_very_cold = ifelse(temperature < 6, 1, 0),
+         temp_cold = ifelse(temperature >= 6 & temperature < 10, 1, 0),
+         temp_mod = ifelse(temperature >= 10 & temperature < 18, 1, 0),
+         temp_warm = ifelse(temperature > 18, 1, 0),
+         temp_eurytherm = NA) %>%
+  mutate(temp_eurytherm = ifelse(is.na(temp_eurytherm), Ther2_botwe, temp_eurytherm), 
+         temp_eurytherm = ifelse(is.na(temp_eurytherm), Ther3_botwe, temp_eurytherm)) %>%
+  select(temp_very_cold:temp_eurytherm) %>%
+  mutate_all(funs(ifelse(is.na(.), 0, .)))
 
 
 # ---- Life Duration ----
 # Only Botwe and VicEPA with data
 # Explanation:
-# 1. life1: < 1 month
-# 3. life2: > 1 month
+# 1. life_1: < 1 month
+# 3. life_2: > 1 month
 
 (life <- fin_AUS[grepl("life", names(fin_AUS), ignore.case = TRUE)])
 
 life <- life %>%
-  mutate(life1 = Life1_botwe, life2 = Life3_botwe) %>%
-  mutate(life1 = ifelse(is.na(life1) | life1 == "0", Life2_botwe, life1),
-         life1 = ifelse(is.na(life1) | life1 == "0", Total_lifespan_less_than_1m_VicEPA, life1)) %>%
-  mutate(life2 = ifelse(is.na(life2) | life2 == "0", Total_lifespan_1_to_3m_VicEPA, life1),
-         life2 = ifelse(is.na(life2) | life2 == "0", Total_lifespan_3_to_12m_VicEPA, life1),
-         life2 = ifelse(is.na(life2) | life2 == "0", Total_lifespan_more_than_1y_VicEPA, life1)) %>%
-  select(life1:life2)
+  na_if(0) %>%
+  mutate(life_1 = Life1_botwe, life_2 = Life3_botwe) %>%
+  mutate(life_1 = ifelse(is.na(life_1), Life2_botwe, life_1),
+         life_1 = ifelse(is.na(life_1), Total_lifespan_less_than_1m_VicEPA, life_1)) %>%
+  mutate(life_2 = ifelse(is.na(life_2), Total_lifespan_1_to_3m_VicEPA, life_1),
+         life_2 = ifelse(is.na(life_2), Total_lifespan_3_to_12m_VicEPA, life_1),
+         life_2 = ifelse(is.na(life_2), Total_lifespan_more_than_1y_VicEPA, life_1)) %>%
+  select(life_1:life_2) %>%
+  mutate_all(funs(ifelse(is.na(.), 0, .)))
+
 
 # ---- Size ----
 # Size in categories seems best option but problems with categories of VicEPA and Botwe
 # Shafer and GBR with specific size in mm
 # Explanation:
-# size1: small (< 9 mm)
-# size2: medium (9 - 16 mm)
-# size3: large (> 16 mm)
+# size_small: small (< 9 mm)
+# size_medium: medium (9 - 16 mm)
+# size_large: large (> 16 mm)
 
 # NOTE: The categories for VicEPA where transformed differently. Up to 10 mm -> small, 10 - 20 mm -> medium, > 20 mm -> large
 
@@ -575,21 +604,32 @@ fin_AUS <- fin_AUS %>%
 size <- select(size, -(Max_body_size_.mm._._number_Shafer:Max_body_size_.mm._._number_bugs_gbr))
 
 size <- size %>%
-  mutate(size1 = Size1_botwe, size2 = Size2_botwe, size3 = Size3_botwe) %>%
-  mutate(size1 = ifelse(is.na(size1) | size1 == 0, Max_size_less_than_5_VicEPA, size1),
-         size1 = ifelse(is.na(size1) | size1 == 0, Max_size_less_than_5_VicEPA, size1),
-         size1 = ifelse(is.na(size1) | size1 == 0, size1_shafer, size1),
-         size1 = ifelse(is.na(size1) | size1 == 0, size1_gbr, size1)) %>%
-  mutate(size2 = ifelse(is.na(size2) | size2 == 0, Max_size_10_to_20_VicEPA, size2),
-         size2 = ifelse(is.na(size2) | size2 == 0, size2_shafer, size2),
-         size2 = ifelse(is.na(size2) | size2 == 0, size2_gbr, size2)) %>%
-  mutate(size3 = ifelse(is.na(size3) | size3 == 0, Max_size_20_to_40_VicEPA, size3),
-         size3 = ifelse(is.na(size3) | size3 == 0, Max_size_more_than_40_VicEPA, size3),
-         size3 = ifelse(is.na(size3) | size3 == 0, size3_shafer, size3),
-         size3 = ifelse(is.na(size3) | size3 == 0, size3_gbr, size3))
+  na_if(0) %>%
+  mutate(size_small = Size1_botwe, size_medium = Size2_botwe, size_large = Size3_botwe) %>%
+  mutate(size_small = ifelse(is.na(size_small), Max_size_less_than_5_VicEPA, size_small),
+         size_small = ifelse(is.na(size_small), Max_size_less_than_5_VicEPA, size_small),
+         size_small = ifelse(is.na(size_small), size1_shafer, size_small),
+         size_small = ifelse(is.na(size_small), size1_gbr, size_small)) %>%
+  mutate(size_medium = ifelse(is.na(size_medium), Max_size_10_to_20_VicEPA, size_medium),
+         size_medium = ifelse(is.na(size_medium), size2_shafer, size_medium),
+         size_medium = ifelse(is.na(size_medium), size2_gbr, size_medium)) %>%
+  mutate(size_large = ifelse(is.na(size_large), Max_size_20_to_40_VicEPA, size_large),
+         size_large = ifelse(is.na(size_large), Max_size_more_than_40_VicEPA, size_large),
+         size_large = ifelse(is.na(size_large), size3_shafer, size_large),
+         size_large = ifelse(is.na(size_large), size3_gbr, size_large)) %>%
+  mutate_all(funs(ifelse(is.na(.), 0, .)))
   
+
 # ---- Aquatic Stages ----
 # Only VicEPA with data on aquatic stages of taxa
+
+aquatic <- fin_AUS[grepl("Aquatic", names(fin_AUS))] 
+aquatic <- aquatic %>%
+  na_if(0) %>%
+  rename(aquatic_egg = Aquatic_eggs_VicEPA, aquatic_nymph = Aquatic_nymph_VicEPA,
+         aquatic_larva = Aquatic_larva_VicEPA, aquatic_pupa = Aquatic_pupa_VicEPA, aquatic_adult = Aquatic_imago_adult_VicEPA) %>%
+  mutate_all(funs(replace(.,. == 3, 1))) %>%
+  mutate_all(funs(ifelse(is.na(.), 0, .)))
 
 
 # NOTE: Information about emergence flight, resistance form, saprobity and dissemination strategy
@@ -615,3 +655,4 @@ df_AUS_compl <- df_AUS_compl[rowSums(is.na(df_AUS_compl[5:ncol(df_AUS_compl)])) 
 
 # --- Save the database as .csv
 write.table(df_AUS_compl, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_AUS.csv", sep = ",")
+
