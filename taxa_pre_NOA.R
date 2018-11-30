@@ -10,12 +10,6 @@ path <- "~/Schreibtisch/Thesis/data"
 #### Packages ####
 library(tidyverse)
 library(data.table)
-# library(readxl)
-# library(reshape2)
-# 
-# library(taxize)
-# library(stringr)
-# library(beepr)
 
 
 # ------------------------------------------------------------------------------------------------------------------------- #
@@ -65,7 +59,7 @@ setcolorder(x = US_trait_DB, neworder = c("TraitRecord_ID", "Taxa", "Family", "G
 
 
 # Remove unneccessary information
-search_col <- grep("Study|Data|Adult|TraitRecord|Comment", names(US_trait_DB), ignore.case = TRUE, value = TRUE)
+search_col <- grep("Study|Data|TraitRecord|Comment", names(US_trait_DB), ignore.case = TRUE, value = TRUE)
 US_trait_DB[, c(search_col) := NULL]
 
 
@@ -132,4 +126,4 @@ setorder(US_trait_DB, Taxa)
 
 # ------------------------------------------------------------------------------------------------------------------------- #
 #### Write Table ####
-write.table(df_NAM, file = "~/Schreibtisch/Thesis/data/North America/macroinvertebrate_NOA_tax.csv", sep = ",")
+write.table(US_trait_DB, file = "~/Schreibtisch/Thesis/data/North America/macroinvertebrate_NOA_tax.csv", sep = ",")
