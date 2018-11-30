@@ -158,7 +158,7 @@ names(df_EUR)[grep(c("alpha$|beta$|^g$|oligo$|poly$|si$|xeno$"), names(df_EUR))]
 
 # Feeding mode
 names(df_EUR)[grep(c("gra$|min$|xyl$|shr$|gat$|aff$|pff$|pre$|par$|oth.1$"), names(df_EUR))] <- 
-  c("feed_grazer", "feed_miner", "feed_xylo", "feed_shredder", "feed_gatherer",
+  c("feed_grazer", "feed_miner", "feed_xylo", "feed_shred", "feed_gath",
     "feed_active_filter", "feed_passive_filter", "feed_predator", "feed_parasite", "feed_other")
 
 # Explanation:  feed_grazer:          grazer/scraper - feed from endolithic and epilithic material
@@ -187,7 +187,7 @@ names(df_EUR)[grep(c("sws$|swd$|bub$|spw$|ses$|oth.2$"), names(df_EUR))] <-
 
 # Respiration
 names(df_EUR)[grep(c("teg|gil|pls|spi|ves|tap|sur"), names(df_EUR))] <- 
-  c("resp_tegument", "resp_gill", "resp_plastron", "resp_spiracle", "resp_vesicle", "resp_tapping", "resp_surface")
+  c("resp_teg", "resp_gil", "resp_pls", "resp_spi", "resp_ves", "resp_tap", "resp_sur")
 
 # Explanation:  resp_tegument:  tegument - respiration through body surface
 #               resp_gill:      gill
