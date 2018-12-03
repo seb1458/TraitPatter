@@ -10,8 +10,6 @@ path <- "~/Schreibtisch/Thesis/data"
 #### Packages ####
 library(tidyverse)
 library(stringr)
-library(taxize)
-library(beepr)
 
 # library(lazyeval)
 # library(reshape2)
@@ -41,6 +39,9 @@ df_EUR$Taxon <- str_trim(gsub(paste0(del, collapse = "|"), "", df_EUR$Taxon))
 
 # ------------------------------------------------------------------------------------------------------------------------- #
 #### Get taxa information ####
+library(taxize)
+library(beepr)
+
 # Two Species can not be found in the gbif database. 
 # 1. Lepidostoma doehleri is missing. Belongs to the family Lepidostoma.
 # 2. Holostomis phalaenoides is also known as Phryganea phalaenoides (https://eprints.lib.hokudai.ac.jp/dspace/bitstream/2115/22222/1/2_P1-6.pdf).
@@ -284,32 +285,6 @@ names(df_EUR)[grep(c("ovo|fie|cie$|fic|frc|vec|tec|ase|pas$"), names(df_EUR))] <
 #               rep_clutch_ter:   terrestrial clutches - groups of eggs are laid down in the riparian zone
 #               rep_asexual:      asexual - reproduction without fertilisation
 #               rep_parasitic:    parasitic - reproduction within a host
-
-
-# ------------------------------------------------------------------------------------------------------------------------- #
-#### Add trait size from Tachet database via table join ####
-tachet <- read.csv(file.path(path, "Europe", "Tachet_mod_csv.csv"), stringsAsFactors = FALSE)[, c(1:14)]
-
-# Merge df_EUR with size information from Tachet
-EU_size <- df_EUR[, 3:5]
-
-# 1. Merge on species level
-EU_size <- merge(EU_size, tachet, by.x = "Taxon", by.y = "taxa", all.x =  TRUE)
-
-# 2. Merge on genus level
-EU_size <- merge(EU_size, tachet, by.x = "genus.x", by.y = "taxa", all.x =  TRUE)
-
-# 3. Combine size columns and add to df_EU
-EU_size <- EU_size %>%
-  transmute(size_1 = size_1.x + size_1.y,
-            size_2 = size_2.x + size_2.y,
-            size_3 = size_3.x + size_3.y,
-            size_4 = size_4.x + size_4.y,
-            size_5 = size_5.x + size_5.y,
-            size_6 = size_6.x + size_6.y,
-            size_7 = size_7.x + size_7.y)
-
-df_EUR <- cbind(df_EUR, EU_size)
 
 
 # ------------------------------------------------------------------------------------------------------------------------- #
