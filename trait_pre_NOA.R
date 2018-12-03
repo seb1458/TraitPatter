@@ -9,7 +9,6 @@ path <- "~/Schreibtisch/Thesis/data"
 # ------------------------------------------------------------------------------------------------------------------------- #
 #### Packages ####
 library(tidyverse)
-library(readxl)
 
 
 # ------------------------------------------------------------------------------------------------------------------------- #
@@ -50,8 +49,20 @@ voltinism <- df_NOA %>%
 
 
 # ---- Aquatic Stages ----
-# ???
+levels(as.factor(df_NOA$No.Aquatic_stages))
 
+stages <- df_NOA %>%
+  mutate(stage_ln = ifelse(grepl("1", No.Aquatic_stages), 1, NA),
+         stage_ln = ifelse(grepl("2", No.Aquatic_stages), 1, stage_ln),
+         stage_ln = ifelse(grepl("3", No.Aquatic_stages), 1, stage_ln),
+         stage_ln = ifelse(grepl("4", No.Aquatic_stages), 1, stage_ln)) %>%
+  mutate(stage_e = ifelse(grepl("2", No.Aquatic_stages), 1, NA),
+         stage_e = ifelse(grepl("3", No.Aquatic_stages), 1, stage_ln),
+         stage_e = ifelse(grepl("4", No.Aquatic_stages), 1, stage_ln)) %>%
+  mutate(stage_p = ifelse(grepl("3", No.Aquatic_stages), 1, NA),
+         stage_p = ifelse(grepl("4", No.Aquatic_stages), 1, stage_p)) %>%
+  mutate(stage_a = ifelse(grepl("4", No.Aquatic_stages), 1, NA)) %>%
+  select(stage_ln:stage_a)
 
 # ---- Feed Mode ----
 # Feed mode "Absorber" is deleted from EUR
@@ -242,10 +253,20 @@ locomotion <- df_NOA %>%
          locom_clinger = ifelse(grepl("clinger", Habit_prim, ignore.case = TRUE), 1, NA),
          locom_planktonic = ifelse(grepl("planktonic", Habit_prim, ignore.case = TRUE), 1, NA),
          locom_skater = ifelse(grepl("skater", Habit_prim, ignore.case = TRUE), 1, NA),
-         locom_sprwaler = ifelse(grepl("sprawler", Habit_prim, ignore.case = TRUE), 1, NA),
+         locom_sprawler = ifelse(grepl("sprawler", Habit_prim, ignore.case = TRUE), 1, NA),
          locom_swimmer = ifelse(grepl("swimmer", Habit_prim, ignore.case = TRUE), 1, NA)) %>%
   select(locom_sessil:locom_swimmer)
 
+
+# ---- Life Duration ----
+levels(as.factor(df_NOA$Adult_lifespan))
+
+life <- df_NOA %>%
+  mutate(life_hours = ifelse(grepl("Hours", Adult_lifespan), 1, NA),
+         life_days = ifelse(grepl("Days", Adult_lifespan), 1, NA),
+         life_weeks = ifelse(grepl("Weeks", Adult_lifespan), 1, NA),
+         life_months = ifelse(grepl("Months", Adult_lifespan), 1, NA)) %>%
+  select(life_hours:life_months)
 
 # ---- Oxygen/Saprobity ----
 saprobity <- select(df_NOA, O2_normal, O2_low)
@@ -254,8 +275,7 @@ saprobity <- select(df_NOA, O2_normal, O2_low)
 # --- pH Preference ----
 ph <- df_NOA %>%
   mutate(ph_acid = pH_acidic,
-         ph_norm = pH_normal) %>%
-  mutate(ph_norm = ifelse(is.na(ph_norm), pH_alkaline, ph_norm)) %>%
+         ph_norm = coalesce(pH_normal, pH_alkaline)) %>%
   select(ph_acid:ph_norm)
 
 
@@ -269,7 +289,7 @@ levels(as.factor(df_NOA$Thermal_pref))
 # ------------------------------------------------------------------------------------------------------------------------- #
 #### Final table ####
 NOA_tax <- df_NOA %>% select(Taxa:Taxon)
-NOA_fin <- cbind(NOA_tax, size, voltinism, feed, resp, drift, saprobity, ph, locomotion)
+NOA_fin <- cbind(NOA_tax, size, voltinism, stages, feed, resp, drift, saprobity, ph, locomotion, life)
 # MISSING: Respiration, temperature preference, salinity preference, locomotion/substrate relation, aquatic stages, reproduction
 
 # Write .csv
