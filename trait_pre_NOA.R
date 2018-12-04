@@ -271,20 +271,18 @@ life <- df_NOA %>%
 # ---- Oxygen/Saprobity ----
 saprobity <- select(df_NOA, O2_normal, O2_low)
 
-
 # --- pH Preference ----
 ph <- df_NOA %>%
   mutate(ph_acid = pH_acidic,
          ph_norm = coalesce(pH_normal, pH_alkaline)) %>%
   select(ph_acid:ph_norm)
 
+# ---- Reproduction ----
+levels(as.factor(df_NOA$Ovipos))
 
 # ---- Temperature preference ----
 levels(as.factor(df_NOA$Thermal_pref))
 
-
-# ---- Salinity preference ----
-# Assigning levels via df_NOA$Salin_fresh, df_NOA$Salin_brakish, df_NOA$Salin_salt?
 
 # ------------------------------------------------------------------------------------------------------------------------- #
 #### Final table ####
@@ -293,4 +291,4 @@ NOA_fin <- cbind(NOA_tax, size, voltinism, stages, feed, resp, drift, saprobity,
 # MISSING: Respiration, temperature preference, salinity preference, locomotion/substrate relation, aquatic stages, reproduction
 
 # Write .csv
-write.table(NOA_fin, file = "~/Schreibtisch/Thesis/data/North America/macroinvertebrate_NOA.csv", sep = ",")
+write.table(NOA_fin, file = "~/Schreibtisch/Thesis/data/North America/macroinvertebrate_NOA_trait.csv", sep = ",")
