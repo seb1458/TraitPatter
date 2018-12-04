@@ -157,13 +157,14 @@ fin_AUS <- fin_AUS %>%
 (rep_names <- grep("rep", names(fin_AUS), value = TRUE, ignore.case = TRUE))
 
 reproduction <- select(fin_AUS, rep_names)
+reproduction <- select(reproduction, -c(1:4))
 
 reproduction <- reproduction %>%
   mutate_all(as.integer) %>%
-  mutate(rep1 = coalesce(Rep1_botwe, repro1_Maxwell, rep1_shafer, rep1_gbr),
-         rep2 = coalesce(Rep2_botwe, repro2_Maxwell, rep2_shafer, rep1_gbr), 
-         rep3 = coalesce(Rep3_botwe, repro3_Maxwell, rep3_shafer, rep3_gbr)) %>%
-  select(rep1:rep3)
+  mutate(rep_aqu = coalesce(Rep1_botwe, repro1_Maxwell, rep1_shafer, rep1_gbr),
+         rep_ter = coalesce(Rep2_botwe, repro2_Maxwell, rep2_shafer, rep1_gbr), 
+         rep_ovo = coalesce(Rep3_botwe, repro3_Maxwell, rep3_shafer, rep3_gbr)) %>%
+  select(rep_aqu:rep_ovo)
 
 
 # ---- Feed Mode ----
@@ -567,4 +568,4 @@ df_AUS_compl <- select(df_AUS_compl, -id_join)
 df_AUS_compl <- df_AUS_compl[rowSums(is.na(df_AUS_compl[5:ncol(df_AUS_compl)])) < ncol(df_AUS_compl[5:ncol(df_AUS_compl)]), ] 
 
 # --- Save the database as .csv
-write.table(df_AUS_compl, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_AUS.csv", sep = ",")
+write.table(df_AUS_compl, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_AUS_trait.csv", sep = ",")
