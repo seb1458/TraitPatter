@@ -2,30 +2,30 @@
 ### Europe DB Fuzzy Codes ###
 #############################
 
-# ------------------------------------------------------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------------------------------------------- #
 #### Working Directory ####
 path <- "~/Schreibtisch/Thesis/data"
 
 
-# ------------------------------------------------------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------------------------------------------- #
 #### Packages ####
 library(tidyverse)
 library(purrr)
 
 
-# ------------------------------------------------------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------------------------------------------- #
 #### Load Data ####
 df_EUR <- read.csv(file.path(path, "Europe", "macroinvertebrate_EUR_trait.csv"))
 
 names(df_EUR)
 df_EUR <- select(df_EUR, -grep("microhab_|current_|temp_|^sal_|^res_|oxy_|dissem_|emerge_|rep_|unknown", names(df_EUR)))
 
-# ------------------------------------------------------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------------------------------------------- #
 #### Transform Fuzzy Codes ####
 # To compare the different databases the coding must be homogenous across all databases. Since fuzzy codes are
 # more complex than binary codes the European codes are transformed to binaries.
 
-# Steps for the transformation
+# Steps for the transformation:
 # 1. Replace all NAs with zeroes
 # 2. Find the maximum value for each row and each trait seperately. The maximum is stored in a new column
 # 3. Transform each modality for each trait according to the maximum column for the respective trait. Each trait
@@ -127,7 +127,7 @@ df_EUR <- df_EUR %>%
   na_if(0)
 
 
-# ------------------------------------------------------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------------------------------------------- #
 #### Final Table ####
 
 # Write .csv
