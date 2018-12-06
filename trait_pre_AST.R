@@ -1,24 +1,27 @@
+#########################################
 #### Preparation: Australia database ####
+#########################################
+
 # ---- Trait Information Preprocessing ----
 
-# ------------------------------------------------------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------------------------------------------- #
 #### Working directory ####
 path <- "~/Schreibtisch/Thesis/data"
 
 
-# ------------------------------------------------------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------------------------------------------- #
 #### Packages ####
 library(tidyverse)
 library(readxl)
 
 
-# ------------------------------------------------------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------------------------------------------- #
 #### Load data ####
 df_AUS <- read.csv(file.path(path, "Australia", "macroinvertebrate_AUS_tax.csv"), stringsAsFactors = FALSE)
 df_AUS <- na_if(df_AUS, 0)
 
 
-# ------------------------------------------------------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------------------------------------------- #
 #### Query traits to keep ####
 # Database Schäfer
 (names_shafer <- grep("shafer", names(df_AUS), ignore.case = TRUE, value = TRUE))
@@ -26,7 +29,8 @@ df_AUS <- na_if(df_AUS, 0)
 keep_shafer <- c(grep("(mS/cm)_Shafer|per_year_Shafer|type_Shafer|capacity_Shafer|group_Shafer|number_Shafer|Respiration_Shafer",
                       names_shafer, value = TRUE, ignore.case = TRUE))
 
-# Keeping: Salinity toelrance, number of generations per year, reproduction type, dispersal capacity, max body size, respiration
+# Keeping: Salinity toelrance, number of generations per year, reproduction type, dispersal capacity,
+# max body size, respiration
 
 
 # Database gbr
@@ -35,7 +39,8 @@ keep_shafer <- c(grep("(mS/cm)_Shafer|per_year_Shafer|type_Shafer|capacity_Shafe
 keep_gbr <- c(grep("(ms/cm)_bugs_gbr|per_year_bugs_gbr|type_bugs_gbr|capacity_bugs_gbr|group_bugs_gbr|number_bugs_gbr|Respiration_bugs_gbr",
                    names_gbr, value = TRUE))
 
-# Keeping: Salinity toelrance, number of generations per year, reproduction type, dispersal capacity, max body size, respiration
+# Keeping: Salinity toelrance, number of generations per year, reproduction type, dispersal capacity,
+# max body size, respiration
 
 dismiss_gbr <- grep("gbr", names(df_AUS), ignore.case = TRUE, value = TRUE)[!grep("gbr", names(df_AUS), ignore.case = TRUE, value = TRUE) %in% keep_gbr]
 
@@ -45,7 +50,8 @@ dismiss_gbr <- grep("gbr", names(df_AUS), ignore.case = TRUE, value = TRUE)[!gre
 
 keep_vicepa <- c(grep("max|voltinism|attach|feeding|respiration|resisant|total|dispersal|aquatic", names_vicepa, value = TRUE, ignore.case = TRUE))
 
-# Keeping: Body size, voltinism, substrate relation, feeding group, respiration, resistant form, total life duration, dispersal, aquatic stages
+# Keeping: Body size, voltinism, substrate relation, feeding group, respiration, resistant form,
+# total life duration, dispersal, aquatic stages
 
 
 # Database Chessman
@@ -63,7 +69,8 @@ keep_chessman <- c(grep("thermophily|shredder|scraper|predator|gatherer|filterer
 
 keep_bowte <- c(grep("Volt|Life|Disp|Drft|Armr|Resp|Size|Ther|Habi|Trop|Sal|Rep",
                      names_bowte, value = TRUE))
-# Keep: Voltinism, life duration, dispersal, drift, armor, respiration, body size, thermophily, habitat preference, trophic status, salinity preference, reproduction
+# Keep: Voltinism, life duration, dispersal, drift, armor, respiration, body size, thermophily,
+# habitat preference, trophic status, salinity preference, reproduction
 
 
 # Database Maxwell
@@ -91,7 +98,7 @@ fin_AUS <- df_AUS %>%
          keep_marchant)
 
 
-# ------------------------------------------------------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------------------------------------------- #
 #### Format trait information ####
 # ---- Voltinism ----
 # Explanation
@@ -445,8 +452,8 @@ ph <- transform(ph, ph = as.numeric(pH_minimum_fam_Chessman2017)) %>%
   select(ph)
 
 ph <- ph %>%
-  mutate(ph_acidic = ifelse(ph < 7, 1, 0),
-         ph_neut_alk = ifelse(ph >= 7, 1, 0)) %>%
+  mutate(ph_acidic = ifelse(ph < 7, 1, NA),
+         ph_neut_alk = ifelse(ph >= 7, 1, NA)) %>%
   select(ph_acidic, ph_neut_alk)
 
 
@@ -542,15 +549,14 @@ aquatic <- aquatic %>%
          aquatic_nymph = Aquatic_nymph_VicEPA,
          aquatic_larva = Aquatic_larva_VicEPA,
          aquatic_pupa = Aquatic_pupa_VicEPA,
-         aquatic_adult = Aquatic_imago_adult_VicEPA) %>%
-  mutate_all(funs(replace(.,. == 3, 1)))
+         aquatic_adult = Aquatic_imago_adult_VicEPA)
 
 
 # NOTE: Information about emergence flight, resistance form, saprobity and dissemination strategy
 # are not included in any database!
 
 
-# ------------------------------------------------------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------------------------------------------- #
 #### Combine all traits with names_AUS ####
 
 # --- Combine trait information and add join ID
@@ -566,6 +572,9 @@ df_AUS_compl <- select(df_AUS_compl, -id_join)
 
 # --- Remove rows with all NAs in trait columns
 df_AUS_compl <- df_AUS_compl[rowSums(is.na(df_AUS_compl[5:ncol(df_AUS_compl)])) < ncol(df_AUS_compl[5:ncol(df_AUS_compl)]), ] 
+
+# --- Replace zeroes with NAs
+df_AUS_compl <- na_if(df_AUS_compl, 0)
 
 # --- Save the database as .csv
 write.table(df_AUS_compl, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_AUS_trait.csv", sep = ",")

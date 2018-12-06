@@ -1,19 +1,21 @@
+#########################################
 #### Preparation: Australia database ####
+#########################################
 #---- Taxa Information Preprocessing ----
 
-
+# --------------------------------------------------------------------------------------------------------------- #
 #### Working directory ####
 path <- "~/Schreibtisch/Thesis/data"
 
 
-
+# --------------------------------------------------------------------------------------------------------------- #
 #### Packages ####
 library(tidyverse)
 library(data.table)
 library(readxl)
 
 
-
+# --------------------------------------------------------------------------------------------------------------- #
 #### Load data ####
 df_AUS <- read_excel(file.path(path, "Australia", "Australian macroinv trait database.xlsx"), sheet = 1)
 
@@ -26,7 +28,7 @@ df_AUS[df_AUS == "N/A"] <- NA
 df_AUS[df_AUS == "NA"] <- NA
 
 
-
+# --------------------------------------------------------------------------------------------------------------- #
 #### Query taxon information ####
 # --- Order + Order_bugs_gbr + Order_fam_Chessman2017
 df_AUS$Order <- coalesce(df_AUS$Order, df_AUS$Order_bugs_gbr, df_AUS$Order_fam_Chessman2017)
@@ -52,7 +54,7 @@ df_AUS <- rbind(df_AUS, AUS_na)
 rm(AUS_na)
 
 
-
+# --------------------------------------------------------------------------------------------------------------- #
 #### Table Join with the ID list ####
 # ID list from Ben Kefford with long_code data and taxon information
 # NOTE: The file containing the long_codes has some format errors for some cells. Remove manually in spreadsheet.
@@ -100,7 +102,7 @@ df_AUS$Genus_and_species <- coalesce(df_AUS$Genus_and_species, df_AUS$Species.vi
 df_AUS <- df_AUS %>% select(-Order.vic, -Family.vic, -Species.vic)
 
 
-
+# --------------------------------------------------------------------------------------------------------------- #
 #### Final Preparation of Taxa Information ####
 # --- Delete incomplete information
 # When NA in Family and long_code: no identification possible
@@ -165,7 +167,7 @@ names(df_AUS)
 df_AUS[, `:=`(Species = unlist(Species), Unresolved_taxa = unlist(Unresolved_taxa) )]
  
 
-
+# --------------------------------------------------------------------------------------------------------------- #
 #### Complement Information ####
 # --- Some entries with missing Order but with information in Family column. 
 # 1. Get all order and family names where Order is not NA
@@ -358,6 +360,8 @@ df_AUS[grep("Super", df_AUS$Order, ignore.case = TRUE)[1], "Order"] <- "Bathynel
 # Family Syncarida is non-existent
 
 
+# --------------------------------------------------------------------------------------------------------------- #
+#### Final Table ####
 
-#### Write .csv ####
+# Write .csv 
 write.table(df_AUS, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_AUS_tax.csv", sep = ",")
