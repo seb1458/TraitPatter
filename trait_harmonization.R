@@ -111,6 +111,7 @@ feed_AUS <- AUS %>%
   mutate(feed_shredder = feed_shred,
          feed_gatherer = feed_gath,
          feed_filter = feed_filt,
+         feed_scraper = feed_scrap,
          feed_predator = feed_pred,
          feed_parasite = feed_para) %>%
   select(feed_shredder:feed_parasite)
