@@ -33,7 +33,7 @@ str(df_AUS)
 # is changed to NAs and 1s according which modalitiy obtains the maximum
 
 # Traits used:
-# voltinism, feeding mode, respiration, locomotion, life duration, size
+# voltinism, feeding mode, respiration, locomotion, life duration, size, substrate relation
 
 # The following traits are already binary coded: Reproduction, drift, pH, temperature preference
 
@@ -50,7 +50,7 @@ df_AUS[5:ncol(df_AUS)] %>% mutate_all(as.factor) %>% sapply(levels)
 str(df_AUS)
 
 
-# ---- 2. Find the maximumg for each row and each trait
+# ---- 2. Find the maximum for each row and each trait
 df_AUS <- df_AUS %>%
   mutate(feed_max = apply(df_AUS[grepl("feed_", names(df_AUS))], 1, max),
          sub_max = apply(df_AUS[grepl("sub_", names(df_AUS))], 1, max),
@@ -118,4 +118,4 @@ df_AUS <- df_AUS %>%
 #### Final table ####
 
 # Write .csv
-write.table(df_AUS, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_AUS.csv", sep = ",")
+write.table(df_AUS, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_AUS.csv", sep = ",")
