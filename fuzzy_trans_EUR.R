@@ -18,7 +18,7 @@ library(purrr)
 df_EUR <- read.csv(file.path(path, "Europe", "macroinvertebrate_EUR_trait.csv"))
 
 names(df_EUR)
-df_EUR <- select(df_EUR, -grep("microhab_|current_|temp_|^sal_|^res_|oxy_|dissem_|emerge_|rep_|unknown", names(df_EUR)))
+df_EUR <- select(df_EUR, -grep("microhab_|current_|^sal_|^res_|oxy_|dissem_|emerge_|unknown", names(df_EUR)))
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Transform Fuzzy Codes ####
@@ -27,7 +27,7 @@ df_EUR <- select(df_EUR, -grep("microhab_|current_|temp_|^sal_|^res_|oxy_|dissem
 
 # Steps for the transformation:
 # 1. Replace all NAs with zeroes
-# 2. Find the maximum value for each row and each trait seperately. The maximum is stored in a new column
+# 2. Find the maximum value for each trait seperately. The maximum is stored in a new column
 # 3. Transform each modality for each trait according to the maximum column for the respective trait. Each trait
 # is changed to NAs and 1s according which modalitiy obtains the maximum
 
@@ -44,11 +44,13 @@ df_EUR <- replace_na(df_EUR, cols)
 # ---- 2. Find the maximumg for each row and each trait ----
 df_EUR <- df_EUR %>%
   mutate(ph_max = apply(df_EUR[grepl("ph_", names(df_EUR))], 1, max),
+         temp_max = apply(df_EUR[grepl("temp_", names(df_EUR))], 1, max),
          feed_max = apply(df_EUR[grepl("feed_", names(df_EUR))], 1, max),
          loc_max = apply(df_EUR[grepl("locom_", names(df_EUR))], 1, max),
          resp_max = apply(df_EUR[grepl("resp_", names(df_EUR))], 1, max),
          drift_max = apply(df_EUR[grepl("dispersal_", names(df_EUR))], 1, max),
          life_max = apply(df_EUR[grepl("lifedur_", names(df_EUR))], 1, max),
+         rep_max = apply(df_EUR[grepl("rep_", names(df_EUR))], 1, max),
          size_max = apply(df_EUR[grepl("size_", names(df_EUR))], 1, max),
          volt_max = apply(df_EUR[grepl("volt_", names(df_EUR))], 1, max),
          stage_max = apply(df_EUR[grepl("stage_", names(df_EUR))], 1, max))
@@ -61,6 +63,13 @@ df_EUR <- df_EUR %>%
   mutate(ph_acidic = ifelse(ph_acidic == ph_max & ph_acidic != 0, 1, NA),
          ph_neutral_alk = ifelse(ph_neutral_alk == ph_max & ph_neutral_alk != 0, 1, NA),
          ph_ind = ifelse(ph_ind == ph_max & ph_ind != 0, 1, NA)) %>%
+  
+  # Temperature
+  mutate(temp_very_cold = ifelse(temp_very_cold == temp_max & temp_very_cold != 0, 1, NA),
+         temp_cold = ifelse(temp_cold == temp_max & temp_cold != 0, 1, NA),
+         temp_moderate = ifelse(temp_moderate == temp_max & temp_moderate != 0, 1, NA),
+         temp_warm = ifelse(temp_warm == temp_max & temp_warm != 0, 1, NA),
+         temp_eurytherm = ifelse(temp_eurytherm == temp_max & temp_eurytherm != 0, 1, NA)) %>%
   
   # Feeding mode
   mutate(feed_grazer = ifelse(feed_grazer == feed_max & feed_grazer != 0, 1, NA),
@@ -106,6 +115,17 @@ df_EUR <- df_EUR %>%
          stage_pupa = ifelse(stage_pupa == stage_max & stage_pupa != 0, 1, NA),
          stage_adult = ifelse(stage_adult == stage_max & stage_adult != 0, 1, NA)) %>%
   
+  # Reproduction
+  mutate(rep_ovovipar = ifelse(rep_ovovipar == rep_max & rep_ovovipar != 0, 1, NA),
+         rep_egg_free_iso = ifelse(rep_egg_free_iso == rep_max & rep_egg_free_iso != 0, 1, NA),
+         rep_egg_cem_iso = ifelse(rep_egg_cem_iso == rep_max & rep_egg_cem_iso != 0, 1, NA),
+         rep_clutch_fixed = ifelse(rep_clutch_fixed == rep_max & rep_clutch_fixed != 0, 1, NA),
+         rep_clutch_free = ifelse(rep_clutch_free == rep_max & rep_clutch_free != 0, 1, NA),
+         rep_clutch_veg = ifelse(rep_clutch_veg == rep_max & rep_clutch_veg != 0, 1, NA),
+         rep_clutch_ter = ifelse(rep_clutch_ter == rep_max & rep_clutch_ter != 0, 1, NA),
+         rep_asexual = ifelse(rep_asexual == rep_max & rep_asexual != 0, 1, NA),
+         rep_parasitic = ifelse(rep_parasitic == rep_max & rep_parasitic != 0, 1, NA)) %>%
+  
   # Size
   mutate(size_1 = ifelse(size_1 == size_max & size_1 != 0, 1, NA),
          size_2 = ifelse(size_2 == size_max & size_2 != 0, 1, NA),
@@ -129,6 +149,6 @@ df_EUR <- df_EUR %>%
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Final Table ####
-
 # Write .csv
+
 write.table(df_EUR, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR.csv", sep = ",")

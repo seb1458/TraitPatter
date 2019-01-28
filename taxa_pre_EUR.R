@@ -292,3 +292,4 @@ names(df_EUR)[grep(c("ovo|fie|cie$|fic|frc|vec|tec|ase|pas$"), names(df_EUR))] <
 # --------------------------------------------------------------------------------------------------------------- #
 #### Write .csv ####
 write.table(df_EUR, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR_complete.csv", sep = ",")
+
