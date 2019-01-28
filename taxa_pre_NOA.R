@@ -12,6 +12,7 @@ path <- "~/Schreibtisch/Thesis/data"
 #### Packages ####
 library(tidyverse)
 library(data.table)
+library(taxize)
 
 
 # --------------------------------------------------------------------------------------------------------------- #
@@ -22,6 +23,12 @@ US_trait_DB <- US_trait_DB %>%
   filter(row_number() %% 2 != 1)
 
 US_trait_DB <- as.data.table(US_trait_DB)
+
+
+# --------------------------------------------------------------------------------------------------------------- #
+#### Check Ovipos_behav_comment column ####
+grep("ovo", US_trait_DB$Ovipos_behav_comment, ignore.case = TRUE) 
+
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Used scripts ####
@@ -59,8 +66,8 @@ US_trait_DB[Taxa %like% ".+dae" & Taxa == Family, Taxa := NA]
 # Change col order
 setcolorder(x = US_trait_DB, neworder = c("TraitRecord_ID", "Taxa", "Family", "Genus", "Taxon"))
 
-
 # Remove unneccessary information
+# US_trait_DB <- rename(US_trait_DB, Ovipos_com = Ovipos_behav_comments)
 search_col <- grep("Study|Data|TraitRecord|Comment", names(US_trait_DB), ignore.case = TRUE, value = TRUE)
 US_trait_DB[, c(search_col) := NULL]
 
@@ -126,6 +133,25 @@ US_trait_DB <- rbind(US_trait_DB[!Taxa %in% US_dupl_taxa$Taxa], US_dupl)
 # Order according to Taxa column 
 setorder(US_trait_DB, Taxa)
 
+
+# --------------------------------------------------------------------------------------------------------------- #
+#### Taxa Information ####
+
+NOA_fam <- unique(US_trait_DB$Family)
+NOA_fam <- NOA_fam[grepl("dae", NOA_fam)] # One family with no entry
+
+# Get order levels from "Global Biodiversity Information Facility" (gbif)
+tax_gbif <- get_ids(names = NOA_fam, db = "gbif")
+cl_gbif <- cbind(classification(tax_gbif$gbif, return_id = FALSE)); beep(4)
+cl_gbif <- cl_gbif %>% select(order, family)
+
+US_trait_DB <- merge(cl_gbif, US_trait_DB, by.x = "family", by.y = "Family")
+US_trait_DB <- US_trait_DB %>%
+  select(order, family, Genus, Taxon, everything()) %>%
+  rename(Order = order, Family = family)
+
+
+
 # --------------------------------------------------------------------------------------------------------------- #
 #### Write Table ####
-write.table(US_trait_DB, file = "~/Schreibtisch/Thesis/data/North America/macroinvertebrate_NOA_tax.csv", sep = ",")
+write.table(US_trait_DB, file = "~/Schreibtisch/Thesis/data/North America/macroinvertebrate_NAM_tax.csv", sep = ",")

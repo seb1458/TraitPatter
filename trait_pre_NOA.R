@@ -15,7 +15,7 @@ library(tidyverse)
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Load Data ####
-df_NOA <- read.csv(file.path(path, "North America", "macroinvertebrate_NOA_tax.csv"), stringsAsFactors = FALSE)
+df_NOA <- read.csv(file.path(path, "North America", "macroinvertebrate_NAM_tax.csv"), stringsAsFactors = FALSE)
 df_NOA <- df_NOA %>% na_if(0) %>% na_if("")
 
 # --------------------------------------------------------------------------------------------------------------- #
@@ -55,15 +55,9 @@ levels(as.factor(df_NOA$No.Aquatic_stages))
 
 stages <- df_NOA %>%
   mutate(stage_ln = ifelse(grepl("1", No.Aquatic_stages), 1, NA),
-         stage_ln = ifelse(grepl("2", No.Aquatic_stages), 1, stage_ln),
-         stage_ln = ifelse(grepl("3", No.Aquatic_stages), 1, stage_ln),
-         stage_ln = ifelse(grepl("4", No.Aquatic_stages), 1, stage_ln)) %>%
-  mutate(stage_e = ifelse(grepl("2", No.Aquatic_stages), 1, NA),
-         stage_e = ifelse(grepl("3", No.Aquatic_stages), 1, stage_ln),
-         stage_e = ifelse(grepl("4", No.Aquatic_stages), 1, stage_ln)) %>%
-  mutate(stage_p = ifelse(grepl("3", No.Aquatic_stages), 1, NA),
-         stage_p = ifelse(grepl("4", No.Aquatic_stages), 1, stage_p)) %>%
-  mutate(stage_a = ifelse(grepl("4", No.Aquatic_stages), 1, NA)) %>%
+         stage_e = ifelse(grepl("2", No.Aquatic_stages), 1, stage_ln),
+         stage_p = ifelse(grepl("3", No.Aquatic_stages), 1, stage_ln),
+         stage_a = ifelse(grepl("4", No.Aquatic_stages), 1, stage_ln)) %>%
   select(stage_ln:stage_a)
 
 # ---- Feed Mode ----
@@ -280,17 +274,41 @@ ph <- df_NOA %>%
   select(ph_acid:ph_norm)
 
 # ---- Reproduction ----
-levels(as.factor(df_NOA$Ovipos))
+levels(as.factor(df_NOA$Ovipos_behav_prim))
+
+rep <- df_NOA %>%
+  mutate(rep_aqu = ifelse(!grepl("bank|overhanging", Ovipos_behav_prim, ignore.case = TRUE), 1, NA),
+         rep_ter = ifelse(grepl("bank|overhanging", Ovipos_behav_prim, ignore.case = TRUE), 1, NA),
+         rep_ovo = ifelse(grepl("ovoviparity", Ovipos_behav_prim, ignore.case = TRUE), 1, NA)) %>%
+  select(rep_aqu:rep_ovo)
+
 
 # ---- Temperature preference ----
 levels(as.factor(df_NOA$Thermal_pref))
 
+# Explanation:  
+# temp_very_cold: very cold (< 5 °C)
+# temp_cold: cold (0-15 °C)
+# temp_mod: moderate (15-30 °C)
+# temp_warm: warm (> 30 °C)
+# temp_ind: indifferente (no strong preference)
+# NOTE: The levels are similar to the levels of the Australian and European databases. They are not identical
+# but are conveniently comparable
+
+temp <- df_NOA %>%
+  mutate(temp_very_cold = ifelse(grepl("<5 c", Thermal_pref, ignore.case = TRUE), 1, NA),
+         temp_cold = ifelse(grepl("0-15 c", Thermal_pref, ignore.case = TRUE), 1, NA),
+         temp_mod = ifelse(grepl("15-30 c", Thermal_pref, ignore.case = TRUE), 1, NA),
+         temp_warm = ifelse(grepl(">30 c", Thermal_pref, ignore.case = TRUE), 1, NA),
+         temp_ind = ifelse(grepl("preference", Thermal_pref, ignore.case = TRUE), 1, NA)) %>%
+  select(temp_very_cold:temp_ind)
+
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Final table ####
-NOA_tax <- df_NOA %>% select(Taxa:Taxon)
-NOA_fin <- cbind(NOA_tax, size, voltinism, stages, feed, resp, drift, saprobity, ph, locomotion, life)
+NOA_tax <- df_NOA %>% select(Order:Taxa)
+NOA_fin <- cbind(NOA_tax, size, voltinism, stages, feed, resp, drift, saprobity, ph, locomotion, life, rep, temp)
 # MISSING: Respiration, temperature preference, salinity preference, locomotion/substrate relation, aquatic stages, reproduction
 
 # Write .csv
-write.table(NOA_fin, file = "~/Schreibtisch/Thesis/data/North America/macroinvertebrate_NOA_trait.csv", sep = ",")
+write.table(NOA_fin, file = "~/Schreibtisch/Thesis/data/North America/macroinvertebrate_NAM_trait.csv", sep = ",")
