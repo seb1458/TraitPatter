@@ -15,11 +15,11 @@ library(tidyverse)
 # --------------------------------------------------------------------------------------------------------------- #
 #### Load Data ####
 EUR <- read.csv(file.path(path, "Europe", "macroinvertebrate_EUR.csv"))
-NAM <- read.csv(file.path(path, "North America", "macroinvertebrate_NOA_trait.csv")) 
+NAM <- read.csv(file.path(path, "North America", "macroinvertebrate_NAM_trait.csv")) 
 AUS <- read.csv(file.path(path, "Australia", "macroinvertebrate_AUS.csv")) 
 
 fin_EUR <- select(EUR, order:Taxon)
-fin_NAM <- select(NAM, Taxa:Taxon)
+fin_NAM <- select(NAM, Order:Taxa)
 fin_AUS <- select(AUS, Order:Species)
 
 # --------------------------------------------------------------------------------------------------------------- #
@@ -146,7 +146,7 @@ locomotion_NAM <- NAM %>%
   mutate(loc_skate = locom_skater,
          loc_swim = coalesce(locom_swimmer, locom_planktonic),
          loc_burrow = locom_burrow,
-         loc_sprawl = locom_sprawler,
+         loc_sprawl = coalesce(locom_sprawler, locom_climber),
          loc_sessil = locom_sessil) %>%
   select(loc_skate:loc_sessil)
 
@@ -160,7 +160,7 @@ locomotion_AUS <- AUS %>%
   mutate(loc_skate = sub_skate,
          loc_swim = sub_swim,
          loc_burrow = sub_burrow,
-         loc_sprawl = sub_sprawl,
+         loc_sprawl = coalesce(sub_sprawl, sub_climb),
          loc_sessil = coalesce(sub_attached_temp, as.integer(sub_attached_perm))) %>%
   select(loc_skate:loc_sessil)
 
@@ -303,8 +303,8 @@ grep("size", names(NAM), ignore.case = TRUE, value = TRUE)
 
 size_NAM <- NAM %>%  
   mutate(size_small = size1,
-         size_medium = size1,
-         size_large = size1) %>%
+         size_medium = size2,
+         size_large = size3) %>%
   select(size_small:size_large)
 
 # --- Australia
@@ -398,15 +398,30 @@ stage_AUS <- AUS %>%
 # ------------------------------------------------------- # 
 # ---- Reproduction ----
 # Modalities
+# rep_aqu: Reproduction via aquatic eggs
+# rep_ter: Reproduction via terrestric eggs
+# rep_ovo: Reproduction via ovoviparity
+
 
 # --- Europe
 grep("rep", names(EUR), ignore.case = TRUE, value = TRUE)
 
+rep_EUR <- EUR %>%
+  mutate_all(as.integer) %>%
+  mutate(rep_aqu = coalesce(rep_egg_cem_iso, rep_egg_free_iso, rep_clutch_free, rep_clutch_fixed),
+         rep_ter = rep_clutch_veg,
+         rep_ovo = coalesce(rep_parasitic, rep_ovovipar)) %>%
+  select(rep_aqu:rep_ovo)
+
 # --- North America
 grep("rep", names(NAM), ignore.case = TRUE, value = TRUE)
 
+rep_NAM <- select(NAM, rep_aqu:rep_ovo)
+
 # --- Australia 
 grep("rep", names(AUS), ignore.case = TRUE, value = TRUE)
+
+rep_AUS <- select(AUS, rep_aqu:rep_ovo)
 
 # ------------------------------------------------------- # 
 # ---- Temperature ----
@@ -415,17 +430,32 @@ grep("rep", names(AUS), ignore.case = TRUE, value = TRUE)
 # --- Europe
 grep("temp", names(EUR), ignore.case = TRUE, value = TRUE)
 
+temp_EUR <- EUR %>%
+  rename(temp_ind = temp_eurytherm, temp_mod = temp_moderate) %>%
+  select(temp_very_cold:temp_ind)
+
 # --- North America
 grep("temp", names(NAM), ignore.case = TRUE, value = TRUE)
 
+temp_NAM <- select(NAM, temp_very_cold:temp_ind)
+         
+         
 # --- Australia 
-grep("temp", names(AUS), ignore.case = TRUE, value = TRUE)
+grep("temp_", names(AUS), ignore.case = TRUE, value = TRUE)
+
+temp_AUS <- AUS %>%
+  rename(temp_ind = temp_eurytherm) %>%
+  select(temp_very_cold:temp_ind)
+         
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Final Table ####
-EUR <- cbind(fin_EUR, ph_EUR, feed_EUR, locomotion_EUR, resp_EUR, drift_EUR, life_EUR, size_EUR, volt_EUR, stage_EUR)
-NAM <- cbind(fin_NAM, ph_NAM, feed_NAM, locomotion_NAM, resp_NAM, drift_NAM, life_NAM, size_NAM, volt_NAM, stage_NAM)
-AUS <- cbind(fin_AUS, ph_AUS, feed_AUS, locomotion_AUS, resp_AUS, drift_AUS, life_AUS, size_AUS, volt_AUS, stage_AUS)
+EUR <- cbind(fin_EUR, ph_EUR, feed_EUR, locomotion_EUR, resp_EUR, drift_EUR,
+             life_EUR, size_EUR, volt_EUR, stage_EUR, rep_EUR, temp_EUR)
+NAM <- cbind(fin_NAM, ph_NAM, feed_NAM, locomotion_NAM, resp_NAM, drift_NAM,
+             life_NAM, size_NAM, volt_NAM, stage_NAM, rep_NAM, temp_NAM)
+AUS <- cbind(fin_AUS, ph_AUS, feed_AUS, locomotion_AUS, resp_AUS, drift_AUS,
+             life_AUS, size_AUS, volt_AUS, stage_AUS, rep_AUS, temp_AUS)
 
 # Write .csv
 write.table(EUR, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR_harmonized.csv", sep = ",")
