@@ -88,8 +88,7 @@ keep_marchant <- names_marchant
 
 # Final columns to keep
 fin_AUS <- df_AUS %>%
-  select(id_join,
-         keep_shafer,
+  select(keep_shafer,
          keep_gbr,
          keep_vicepa,
          keep_chessman,
@@ -561,20 +560,16 @@ aquatic <- aquatic %>%
 
 # --- Combine trait information and add join ID
 trait_AUS <- cbind(voltinism, reproduction, feeding, respiration, drift, substrate, ph, temperature, life, size, aquatic)
-trait_AUS$id_join <- 1:nrow(trait_AUS)
 
 # --- Taxon information from df_AUS
-names_AUS <- df_AUS %>% select(Order:Species, id_join)
+names_AUS <- df_AUS %>% select(Order:Species)
 
 # --- Merge names_AUS with trait_AUS via id_join
-df_AUS_compl <- merge(x = names_AUS, y = trait_AUS, by = "id_join", all.x = TRUE)
-df_AUS_compl <- select(df_AUS_compl, -id_join)
+df_AUS_compl <- cbind(names_AUS, trait_AUS)
 
 # --- Remove rows with all NAs in trait columns
 df_AUS_compl <- df_AUS_compl[rowSums(is.na(df_AUS_compl[5:ncol(df_AUS_compl)])) < ncol(df_AUS_compl[5:ncol(df_AUS_compl)]), ] 
 
-# --- Replace zeroes with NAs
-df_AUS_compl <- na_if(df_AUS_compl, 0)
 
 # --- Save the database as .csv
 write.table(df_AUS_compl, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_AUS_trait.csv", sep = ",")
