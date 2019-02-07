@@ -30,6 +30,16 @@ setwd("~/Schreibtisch/Thesis/final_paper/Figures/results/SOM")
 
 
 # --------------------------------------------------------------------------------------------------------------- #
+#### Number of Cells for SOM Grid
+5*sqrt(length(EUR[, 4:ncol(EUR)]))
+# 32 cells are sufficient
+
+
+0.1*length(EUR[, 4:ncol(EUR)])
+# 4 Nodes
+
+
+# --------------------------------------------------------------------------------------------------------------- #
 #### SOM: Europe ####
 names(EUR)
 
@@ -39,11 +49,11 @@ EUR_dat <- EUR[4:ncol(EUR)]
 EUR_dat <- as.matrix(EUR_dat)
 
 # --- Set grid
-grid_dim <- somgrid(10, 10, "hexagonal")
+grid_dim <- somgrid(4, 4, "hexagonal")
 
 # --- Compute map
 set.seed(123)
-som_EUR <- som(EUR_dat, grid = grid_dim, rlen = 1800); beep(4)
+som_EUR <- som(EUR_dat, grid = grid_dim, rlen = 8000); beep(4)
 
 # Plot training process
 plot(som_EUR, type = "changes")

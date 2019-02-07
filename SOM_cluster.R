@@ -19,118 +19,11 @@ library(beepr)
 
 
 # --------------------------------------------------------------------------------------------------------------- #
-#### SOM: Europe ####
-EUR <- read.table(file.path(path, "final", "macroinvertebrate_EUR_bin.csv"), sep = ",", row.names = 1, header = TRUE)
-
-str(EUR)
-
-# --- Trait used voltinism
-data <- EUR[4:ncol(EUR)]
-
-data <- as.matrix(data)
-
-# --- Set grid
-grid_dim <- somgrid(10, 10, "hexagonal")
-
-# --- Calculate map
-set.seed(123)
-som_model <- som(data, grid = grid_dim, rlen = 1800); beep(4)
-
-# Plot training process
-plot(som_model, type = "changes")
-
-# --- Heat map of voltinism
-str(som_model)
-som_model$codes
-
-png(filename = "~/Schreibtisch/Thesis/data/final/plots/SOM_EUR_locomotion_all.png")
-par(mfrow = c(2,3))
-plot(som_model, type = "property", property = som_model$codes[[1]][, 9], main = "Skater")
-plot(som_model, type = "property", property = som_model$codes[[1]][, 10], main = "Swimmer")
-plot(som_model, type = "property", property = som_model$codes[[1]][, 11], main = "Burrower")
-plot(som_model, type = "property", property = som_model$codes[[1]][, 12], main = "Sprawler")
-plot(som_model, type = "property", property = som_model$codes[[1]][, 13], main = "Sessil")
-dev.off()
-
-# --- Test with reproduction
-# Reproduction only has 0 and 1 as information. Pilliere reproduceable?
-
-# --- Heat map of voltinism
-str(som_model)
-som_model$codes
-
-png(filename = "~/Schreibtisch/Thesis/data/final/plots/SOM_EUR_reproduction_all.png")
-par(mfrow = c(1,3))
-plot(som_model, type = "property", property = som_model$codes[[1]][, 33], main = "Aquatic Eggs")
-plot(som_model, type = "property", property = som_model$codes[[1]][, 34], main = "Terrestrial Eggs")
-plot(som_model, type = "property", property = som_model$codes[[1]][, 35], main = "Ovoviparity")
-dev.off()
-
-
-# --- Model with only locomotion trait
-data <- select(EUR, grep("loc_", names(EUR)))
-
-data <- as.matrix(data)
-
-# --- Set grid
-grid_dim <- somgrid(10, 10, "hexagonal")
-
-# --- Calculate map
-set.seed(123)
-som_loc <- som(data, grid = grid_dim, rlen = 500); beep(4)
-
-# Plot training process
-plot(som_loc, type = "changes")
-
-# --- Heat map of voltinism
-str(som_loc)
-som_loc$codes
-
-png(filename = "~/Schreibtisch/Thesis/data/final/plots/SOM_EUR_locomotion_iso.png")
-par(mfrow = c(2,3))
-plot(som_loc, type = "property", property = som_loc$codes[[1]][, 1], main = "Skater")
-plot(som_loc, type = "property", property = som_loc$codes[[1]][, 2], main = "Swimmer")
-plot(som_loc, type = "property", property = som_loc$codes[[1]][, 3], main = "Burrower")
-plot(som_loc, type = "property", property = som_loc$codes[[1]][, 4], main = "Sprawler")
-plot(som_loc, type = "property", property = som_loc$codes[[1]][, 5], main = "Sessil")
-dev.off()
-
-
-# ------------------------------------------------------------- #
-# ---- Test ----
-EUR <- read.table(file.path(path, "final", "macroinvertebrate_EUR_int.csv"), sep = ",", row.names = 1, header = TRUE)
-
-data <- select(EUR, voltinism)
-levels(as.factor(data$voltinism))
-
-row1 <- which(data$voltinism == 1)
-row2 <- which(data$voltinism == 2)
-row3 <- which(data$voltinism == 3)
-
-# ---- SOM ---- #
-matrix <- as.matrix(data)
-
-# Set grid
-grid_dim <- somgrid(10, 10, "hexagonal")
-
-# Calculate map
-set.seed(123)
-som_model <- som(matrix, grid = grid_dim, rlen = 500); beep(4)
-
-# Plot training process
-plot(som_model, type = "changes")
-
-# Plot modality maps
-som_model$codes
-
-plot(som_model, type = "count")
-
-# ------------------------------------------------------------- #
-# ---- Clustering SOM: Europe ---- 
+#### Clustering SOM: Europe #### 
 data <- read.table(file.path(path, "final", "macroinvertebrate_EUR_int.csv"), sep = ",", row.names = 1, header = TRUE)
 
 # ---- SOM ---- #
-matrix <- as.matrix(data[5:ncol(data)])
+matrix <- as.matrix(data[4:ncol(data)])
 
 # Set grid
 grid_dim <- somgrid(10, 10, "hexagonal")
@@ -148,8 +41,9 @@ set.seed(123)
 
 # Compute and plot wss for k = 2 to k = 10
 k.max <- 10
+codes <- getCodes(som_model)
 
-wss_dat <- matrix(unlist(som_model$codes), nrow = 100, ncol = 9, byrow = FALSE)
+wss_dat <- matrix(codes, nrow = nrow(codes), ncol = ncol(codes), byrow = FALSE)
 
 wss <- sapply(1:k.max, function(k){kmeans(wss_dat, k, nstart = 50, iter.max = 15 )$tot.withinss})
 
@@ -161,7 +55,8 @@ plot(1:k.max, wss,
 # Number of clusters: 5
 
 # --- Hierarchical clustering
-som_cluster <- cutree(hclust(dist(unlist(som_model$codes))), 5)
+set.seed(123)
+som_cluster <- cutree(hclust(dist(codes)), 5)
 
 # --- Plotting
 # Create categories with top 10 orders and other-typologie
@@ -189,7 +84,7 @@ data$cluster <- cluster_assignment
 data <- read.table(file.path(path, "final", "macroinvertebrate_NAM_int.csv"), sep = ",", row.names = 1, header = TRUE)
 
 # ---- SOM ---- #
-matrix <- as.matrix(data[5:ncol(data)])
+matrix <- as.matrix(data[4:ncol(data)])
 
 # Set grid
 grid_dim <- somgrid(10, 10, "hexagonal")
@@ -207,8 +102,9 @@ set.seed(123)
 
 # Compute and plot wss for k = 2 to k = 10
 k.max <- 10
+codes <- getCodes(som_model)
 
-wss_dat <- matrix(unlist(som_model$codes), nrow = 100, ncol = 9, byrow = FALSE)
+wss_dat <- matrix(codes, nrow = nrow(codes), ncol = ncol(codes), byrow = FALSE)
 
 wss <- sapply(1:k.max, function(k){kmeans(wss_dat, k, nstart = 50, iter.max = 15 )$tot.withinss})
 
@@ -220,7 +116,7 @@ plot(1:k.max, wss,
 # Number of clusters: 4
 
 # ---- Hierarchical clustering ---- #
-som_cluster <- cutree(hclust(dist(unlist(som_model$codes))), 4)
+som_cluster <- cutree(hclust(dist(codes)), 4)
 
 # --- Plotting
 # Create categories with top 10 orders and other-typologie
@@ -247,7 +143,7 @@ data$cluster <- cluster_assignment
 data <- read.table(file.path(path, "final", "macroinvertebrate_AUS_int.csv"), sep = ",", row.names = 1, header = TRUE)
 
 # ---- SOM ---- #
-matrix <- as.matrix(data[5:ncol(data)])
+matrix <- as.matrix(data[4:ncol(data)])
 
 # Set grid
 grid_dim <- somgrid(10, 10, "hexagonal")
@@ -264,9 +160,9 @@ plot(som_model, type = "changes")
 set.seed(123)
 
 # Compute and plot wss for k = 2 to k = 10
-k.max <- 10
+codes <- getCodes(som_model)
 
-wss_dat <- matrix(unlist(som_model$codes), nrow = 100, ncol = 9, byrow = FALSE)
+wss_dat <- matrix(codes, nrow = nrow(codes), ncol = ncol(codes), byrow = FALSE)
 
 wss <- sapply(1:k.max, function(k){kmeans(wss_dat, k, nstart = 50, iter.max = 15 )$tot.withinss})
 
@@ -278,7 +174,7 @@ plot(1:k.max, wss,
 # Number of clusters: 3
 
 # --- Hierarchical clustering
-som_cluster <- cutree(hclust(dist(unlist(som_model$codes))), 3)
+som_cluster <- cutree(hclust(dist(codes)), 3)
 
 # --- Plotting
 # Create categories with top 10 orders and other-typologie

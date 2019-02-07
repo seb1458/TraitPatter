@@ -23,10 +23,36 @@ library(ggsci)      # Scientific journal palettes
 
 
 # --------------------------------------------------------------------------------------------------------------- #
+#### Change names of categories ####
+source("~/Schreibtisch/Thesis/scripts/stats/cleanUp.R")
+
+
+# --------------------------------------------------------------------------------------------------------------- #
+#### Check Trait Modalities for Double Entries ####
+check <- read.table(file.path(path, "final", "macroinvertebrate_ALL_bin_fancy.csv"), sep = ",", row.names = 1, header = TRUE)
+names(check)
+
+check <- check %>%
+  mutate(ph_sum = rowSums(.[grepl("ph_", names(check))]),
+         feed_sum = rowSums(.[grepl("feed_", names(check))]),
+         loc_sum = rowSums(.[grepl("loc_", names(check))]),
+         resp_sum = rowSums(.[grepl("resp_", names(check))]),
+         drift_sum = rowSums(.[grepl("drift_", names(check))]),
+         life_sum = rowSums(.[grepl("life", names(check))]),
+         size_sum = rowSums(.[grepl("size_", names(check))]),
+         volt_sum = rowSums(.[grepl("volt_", names(check))]),
+         stage_sum = rowSums(.[grepl("stage_", names(check))]),
+         rep_sum = rowSums(.[grepl("rep_", names(check))]),
+         ph_sum = rowSums(.[grepl("temp_", names(check))]),
+         total_sum = rowSums(.[4:ncol(check)])) %>%
+  filter(total_sum > 10)
+
+
+# --------------------------------------------------------------------------------------------------------------- #
 #### NMDS ####
 # --- Load data
-trait_fin <- read.table(file.path(path, "final", "macroinvertebrate_ALL_bin.csv"), sep = ",", row.names = 1, header = TRUE)
-str(trait_fin)
+trait_fin <- read.table(file.path(path, "final", "macroinvertebrate_ALL_bin_fancy.csv"), sep = ",", row.names = 1, header = TRUE)
+names(trait_fin)
 
 # --- Distance Matrix
 trait_fin <- trait_fin %>%
@@ -38,7 +64,7 @@ trait_fin <- trait_fin %>%
   select(-rowSums)
 
 # --- Calculate distance matrix
-dist_trait <- vegdist(trait_fin[, 4:ncol(trait_fin)], method = 'bray')
+dist_trait <- vegdist(trait_fin[, 4:ncol(trait_fin)], method = 'jaccard')
 
 # --- Run NMDS
 nmds <- metaMDS(dist_trait); beep(4)
@@ -47,247 +73,65 @@ plot(nmds, type = 'text')
 
 
 # Outlier: 110, and maybe 17
-trait_fin <- trait_fin[-c(17, 110), ]
-dist_trait <- vegdist(trait_fin[, 4:ncol(trait_fin)], method = 'bray')
+trait_fin <- trait_fin[-c(9, 98), ]
+dist_trait <- vegdist(trait_fin[, 4:ncol(trait_fin)], method = 'jaccard')
 
 set.seed(123)
 nmds <- metaMDS(dist_trait); beep(4)
-stressplot(nmds)
+
+stressplot(nmds) # Stress: 0.2
 plot(nmds, type = 'text') 
 
 # --- Plot NMDS
 scores <- as.data.frame(scores(nmds)) # Site scores
 scores$site <- rownames(scores) # Site scores
 
-reg <- trait_fin$region # Extract region levels
-scores$region <- reg # Add region levels to the site scores
+reg <- trait_fin$Region # Extract region levels
+scores$Region <- reg # Add region levels to the site scores
 head(scores)
 
-grp_EUR <- scores[scores$region == "EUR", ][chull(scores[scores$region == "EUR", c("NMDS1", "NMDS2")]), ] # hull values EUR
-grp_NAM <- scores[scores$region == "NAM", ][chull(scores[scores$region == "NAM", c("NMDS1", "NMDS2")]), ] # hull values NAM
-grp_AUS <- scores[scores$region == "AUS", ][chull(scores[scores$region == "AUS", c("NMDS1", "NMDS2")]), ] # hull values AUS
+grp_EUR <- scores[scores$Region == "Europe", ][chull(scores[scores$Region == "Europe", c("NMDS1", "NMDS2")]), ] # hull values EUR
+grp_NAM <- scores[scores$Region == "North America", ][chull(scores[scores$Region == "North America", c("NMDS1", "NMDS2")]), ] # hull values NAM
+grp_AUS <- scores[scores$Region == "Australia", ][chull(scores[scores$Region == "Australia", c("NMDS1", "NMDS2")]), ] # hull values AUS
 hull <- rbind(grp_EUR, grp_NAM, grp_AUS)
 
 ggplot() + 
-  geom_polygon(data = hull, aes(x = NMDS1, y = NMDS2, fill = region, group = region), alpha = 0.2) +
-  geom_point(data = scores, aes(x = NMDS1, y = NMDS2, colour = region, shape = region), size = 1.5) +
-  scale_colour_manual(values = c("EUR" = "green", "NAM" = "blue", "AUS" = "red")) +
+  geom_polygon(data = hull, aes(x = NMDS1, y = NMDS2, fill = Region, group = Region), alpha = 0.2) +
+  geom_point(data = scores, aes(x = NMDS1, y = NMDS2, colour = Region, shape = Region), size = 1.5) +
+  scale_colour_manual(values = c("Europe" = "darkgreen", "North America" = "blue", "Australia" = "red")) +
   coord_equal() +
-  theme_bw() +
-  ggtitle("NMDS of trait data (Databases: EUR, NAM, AUS)")
+  theme_bw()
 
-ggsave("trait_NMDS.png", path = plot)
-
-# op <- ordiplot(nmds, type = 'n')
-# 
-# cols = c('darkred', 'green')
-# points(nmds, pch = 16, col = cols[trait_fin$region])
-# 
-# ordispider(nmds, groups = trait_fin$region, label = TRUE, col = 'lightgray')
-# ordihull(nmds, groups = trait_fin$region, lty = 'dotted')
-# legend("bottomright", pch = 16, col = cols, legend = levels(rait_fin$region))
+ggsave("trait_NMDS.pdf", path = plot)
 
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### PERMANOVA ####
-trait_pmv <- adonis(dist_trait ~ region, data = trait_fin, 
-              permutations = 999, 
-              method = 'bray'); beep(4)
+trait_pmv <- adonis(dist_trait ~ Region, data = trait_fin, 
+                    permutations = 999, 
+                    method = 'bray'); beep(4)
 trait_pmv
 
 # The traits are statistically different between the regions. 
-# But the regions (EUR, NAM, AUS) explain only 20.35 % of the variance 
+# But the regions (EUR, NAM, AUS) explain only 11.1 % of the variance 
 
 # --- Check assumptions
+
+pdf(file = "~/Schreibtisch/Thesis/final_paper/Figures/results/permutation_plot.pdf")
 densityplot(permustats(trait_pmv))
+dev.off()
 
 # --------------------------------------------------------------------------------------------------------------- #
-
 #### MCA ####
 
-# ---- Load Data ----
-EUR <- read.table(file.path(path, "final", "macroinvertebrate_EUR_mod.csv"), sep = ",", row.names = 1, header = TRUE)
-NAM <- read.table(file.path(path, "final", "macroinvertebrate_NAM_mod.csv"), sep = ",", row.names = 1, header = TRUE)
-AUS <- read.table(file.path(path, "final", "macroinvertebrate_AUS_mod.csv"), sep = ",", row.names = 1, header = TRUE)
-ALL <- read.table(file.path(path, "final", "macroinvertebrate_ALL_mod.csv"), sep = ",", row.names = 1, header = TRUE)
+# ---- Load Data
+ALL <- read.table(file.path(path, "final", "macroinvertebrate_ALL_mod_fancy.csv"), sep = ",", check.names = FALSE)
+summary(ALL)
 
-# ------------------------------------------------------------- #
-# ---- Europe ----
-str(EUR)
+# Remove outliers (see above NMDS)
+ALL <- ALL[, -c(17, 110)]
 
-mca_EUR <- MCA(EUR[3:ncol(trait_mca)], graph = FALSE)
-
-# Biplot
-cats = apply(EUR[3:ncol(trait_mca)], 2, function(x) nlevels(as.factor(x)))
-cats
-
-MCA_vars <- data.frame(mca_EUR$var$coord, Variable = rep(names(cats), cats))
-MCA_obs <- data.frame(mca_EUR$ind$coord)
-
-# ggplot(data = MCA_vars, aes(x = Dim.1, y = Dim.2, label = rownames(MCA_vars))) +
-#   geom_hline(yintercept = 0, colour = "gray70") +
-#   geom_vline(xintercept = 0, colour = "gray70") +
-#   geom_text(aes(colour = Variable)) +
-#   ggtitle("MCA plot of traits")
-# 
-# dev.copy(pdf, "MCA biplot.pdf")
-# dev.off()
-
-# --- Screeplot
-fviz_screeplot(mca_EUR, addlabels = TRUE, ylim = c(0, 20))
-ggsave("MCA_EUR_screeplot.png", path = plot)
-
-# --- Biplot with density curves
-ggplot(data = MCA_obs, aes(x = Dim.1, y = Dim.2)) +
-  geom_hline(yintercept = 0, colour = "gray70") +
-  geom_vline(xintercept = 0, colour = "gray70") +
-  geom_point(colour = "gray50", alpha = 0.7) +
-  geom_density2d(colour = "gray80") +
-  geom_text(data = MCA_vars, aes(x = Dim.1, y = Dim.2, label = rownames(MCA_vars), colour = Variable)) +
-  ggtitle("MCA plot of traits and their modalities") +
-  scale_colour_discrete(name = "Variable") +
-  theme_bw() +
-  xlab("Dim 1 (14.5 %)") +
-  ylab("Dim 2 (9.5 %)")
-
-ggsave("MCA_EUR_biplot_density.png", path = plot)
-
-# --- Contribution of variables
-fviz_mca_var(mca_EUR, col.var = "contrib",
-             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
-             repel = TRUE, # avoid text overlapping (slow)
-             ggtheme = theme_minimal())
-
-ggsave("MCA_EUR_vars_contribution.png", path = plot)
-
-
-# --- Ellipse plot
-fviz_ellipses(mca_EUR, 1:4, geom = "point")
-fviz_ellipses(mca_EUR, 5:9, geom = "point")
-
-# ggsave("MCA_ellipse.png", path = plot)
-
-
-# ------------------------------------------------------------- #
-# ---- North America  ---- 
-str(NAM)
-
-mca_NAM <- MCA(NAM[3:ncol(trait_mca)], graph = FALSE)
-
-# Biplot
-cats = apply(NAM[3:ncol(trait_mca)], 2, function(x) nlevels(as.factor(x)))
-cats
-
-MCA_vars <- data.frame(mca_NAM$var$coord, Variable = rep(names(cats), cats))
-MCA_obs <- data.frame(mca_NAM$ind$coord)
-
-# ggplot(data = MCA_vars, aes(x = Dim.1, y = Dim.2, label = rownames(MCA_vars))) +
-#   geom_hline(yintercept = 0, colour = "gray70") +
-#   geom_vline(xintercept = 0, colour = "gray70") +
-#   geom_text(aes(colour = Variable)) +
-#   ggtitle("MCA plot of traits")
-# 
-# dev.copy(pdf, "MCA biplot.pdf")
-# dev.off()
-
-# --- Screeplot
-fviz_screeplot(mca_NAM, addlabels = TRUE, ylim = c(0, 20))
-ggsave("MCA_NAM_screeplot.png", path = plot)
-
-# --- Biplot with density curves
-ggplot(data = MCA_obs, aes(x = Dim.1, y = Dim.2)) +
-  geom_hline(yintercept = 0, colour = "gray70") +
-  geom_vline(xintercept = 0, colour = "gray70") +
-  geom_point(colour = "gray50", alpha = 0.7) +
-  geom_density2d(colour = "gray80") +
-  geom_text(data = MCA_vars, aes(x = Dim.1, y = Dim.2, label = rownames(MCA_vars), colour = Variable)) +
-  ggtitle("MCA plot of traits and their modalities") +
-  scale_colour_discrete(name = "Variable") +
-  theme_bw() +
-  xlab("Dim 1 (16.3 %)") +
-  ylab("Dim 2 (10.2 %)")
-
-ggsave("MCA_NAM_biplot_density.png", path = plot)
-
-# --- Contribution of variables
-fviz_mca_var(mca_NAM, col.var = "contrib",
-             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
-             repel = TRUE, # avoid text overlapping (slow)
-             ggtheme = theme_minimal())
-
-ggsave("MCA_NAM_vars_contribution.png", path = plot)
-
-
-# --- Ellipse plot
-fviz_ellipses(mca_NAM, 1:4, geom = "point")
-fviz_ellipses(mca_NAM, 5:9, geom = "point")
-
-# ggsave("MCA_ellipse.png", path = plot)
-
-
-# ------------------------------------------------------------- #
-# ---- Australia  ---- 
-str(AUS)
-
-mca_AUS <- MCA(AUS[3:ncol(trait_mca)], graph = FALSE)
-
-# Biplot
-cats = apply(AUS[3:ncol(trait_mca)], 2, function(x) nlevels(as.factor(x)))
-cats
-
-MCA_vars <- data.frame(mca_AUS$var$coord, Variable = rep(names(cats), cats))
-MCA_obs <- data.frame(mca_AUS$ind$coord)
-
-# ggplot(data = MCA_vars, aes(x = Dim.1, y = Dim.2, label = rownames(MCA_vars))) +
-#   geom_hline(yintercept = 0, colour = "gray70") +
-#   geom_vline(xintercept = 0, colour = "gray70") +
-#   geom_text(aes(colour = Variable)) +
-#   ggtitle("MCA plot of traits")
-# 
-# dev.copy(pdf, "MCA biplot.pdf")
-# dev.off()
-
-# --- Screeplot
-fviz_screeplot(mca_AUS, addlabels = TRUE, ylim = c(0, 50))
-ggsave("MCA_AUS_screeplot.png", path = plot)
-
-# --- Biplot with density curves
-ggplot(data = MCA_obs, aes(x = Dim.1, y = Dim.2)) +
-  geom_hline(yintercept = 0, colour = "gray70") +
-  geom_vline(xintercept = 0, colour = "gray70") +
-  geom_point(colour = "gray50", alpha = 0.7) +
-  geom_density2d(colour = "gray80") +
-  geom_text(data = MCA_vars, aes(x = Dim.1, y = Dim.2, label = rownames(MCA_vars), colour = Variable)) +
-  ggtitle("MCA plot of traits and their modalities") +
-  scale_colour_discrete(name = "Variable") +
-  theme_bw() +
-  xlab("Dim 1 (16.3 %)") +
-  ylab("Dim 2 (10.2 %)")
-
-ggsave("MCA_AUS_biplot_density.png", path = plot)
-
-# --- Contribution of variables
-fviz_mca_var(mca_AUS, col.var = "contrib",
-             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
-             repel = TRUE, # avoid text overlapping (slow)
-             ggtheme = theme_minimal())
-
-ggsave("MCA_AUS_vars_contribution.png", path = plot)
-
-
-# --- Ellipse plot
-fviz_ellipses(mca_AUS, 1:4, geom = "point")
-fviz_ellipses(mca_AUS, 5:9, geom = "point")
-
-# ggsave("MCA_ellipse.png", path = plot)
-
-
-# ------------------------------------------------------------- #
-# ---- All Regions  ----
-str(ALL)
-names(ALL) <- c("Order", "Family", "Region", "pH Preference", "Temperature Preference", "Feeding Mode", "Locomotion",
-                "Respiration", "Drift", "Size", "Reproduction", "Aquatic Stages", "Voltinism") 
-
+# --- MCA
 mca_ALL <- MCA(ALL[3:ncol(ALL)], graph = FALSE)
 
 # Biplot
@@ -311,34 +155,21 @@ fviz_screeplot(mca_ALL, addlabels = TRUE, ylim = c(0, 15))
 ggsave("MCA_ALL_screeplot.pdf", path = plot)
 
 # --- Biplot with density curves (1st and 2nd dimenstion)
-# Prepare plotting
-row.names(MCA_vars) <- c("Australia", "Europe", "North America", 
-                         "Acidic", "Neutral/Alkaline", 
-                         "Cold", "Indifferent", "Moderate", "Very Cold", "Warm",
-                         "Filter-feeder", "Gatherer", "Parasite", "Predator", "Scraper", "Shredder",
-                         "Burrower", "Sessil", "Skater", "Sprawler", "Swimmer",
-                         "Atmospheric", "Gills", "Plastron", "Spiracle", "Tegument",
-                         "High", "Low",
-                         "Large", "Medium", "Small",
-                         "Aquatic Eggs", "Terrestric Eggs", "Ovoviparity",
-                         "Eggs only", "-Larva", "-Pupa", "-Adult",
-                         "Semivoltine", "Univoltine", "Multivoltine")
 
-
-# Plot
 ggplot(data = MCA_obs, aes(x = Dim.1, y = Dim.2)) +
   geom_hline(yintercept = 0, colour = "gray70") +
   geom_vline(xintercept = 0, colour = "gray70") +
   geom_point(colour = "gray50", alpha = 0.1) +
+  xlim(-1.7, 2) +
+  ylim(-1, 2.5) +
   # geom_density2d(colour = "gray80") +
   
   geom_text(data = MCA_vars,
             aes(x = Dim.1, y = Dim.2, label = rownames(MCA_vars), colour = Variable)) +
   # scale_colour_discrete(name = "Variable") +
   theme_bw() +
-  scale_color_discrete() +
   
-  ggtitle("MCA plot of traits and their modalities") +
+  # ggtitle("MCA plot of traits and their modalities") +
   xlab("Dim 1 %%%") +
   ylab("Dim 2 %%%")
 
@@ -349,17 +180,18 @@ ggplot(data = MCA_obs, aes(x = Dim.3, y = Dim.4)) +
   geom_hline(yintercept = 0, colour = "gray70") +
   geom_vline(xintercept = 0, colour = "gray70") +
   geom_point(colour = "gray50", alpha = 0.1) +
+  xlim(-2, 2) +
+  ylim(-2, 2) +
   # geom_density2d(colour = "gray80") +
   
   geom_text(data = MCA_vars,
-            aes(x = Dim.1, y = Dim.2, label = rownames(MCA_vars), colour = Variable)) +
+            aes(x = Dim.3, y = Dim.4, label = rownames(MCA_vars), colour = Variable)) +
   # scale_colour_discrete(name = "Variable") +
   theme_bw() +
-  scale_color_ucscgb() +
   
-  ggtitle("MCA plot of traits and their modalities") +
-  xlab("Dim 1 %%%") +
-  ylab("Dim 2 %%%")
+  # ggtitle("MCA plot of traits and their modalities") +
+  xlab("Dim 3 %%%") +
+  ylab("Dim 4 %%%")
 
 
 ggsave("MCA_ALL_biplot_density_dim34.pdf", path = plot)
@@ -367,15 +199,22 @@ ggsave("MCA_ALL_biplot_density_dim34.pdf", path = plot)
 # --- Contribution of variables
 fviz_mca_var(mca_ALL, col.var = "contrib",
              gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
-             repel = TRUE, # avoid text overlapping (slow)
+             repel = TRUE,
+             alpha.var = "cos2", 
              ggtheme = theme_minimal())
 
 ggsave("MCA_ALL_vars_contribution.png", path = plot)
 
 
+# --- Correlation between principal dimenions and variables
+fviz_mca_var(mca_ALL, choice = "mca.cor", 
+             repel = TRUE, # Avoid text overlapping (slow)
+             ggtheme = theme_minimal())
+
 # --- Ellipse plot
-par(mfrow = c(3,1))
-fviz_ellipses(mca_ALL, 1, geom = "point", palette = "aaas")
+fviz_mca_ind(mca_ALL, label = "none", habillage = "Region", addEllipses = TRUE, ellipse.type = "confidence", 
+             palette = c("red", "darkgreen", "blue"), ggtheme = theme_minimal()) 
+
 fviz_ellipses(mca_ALL, c(2, 3), geom = "point")
 fviz_ellipses(mca_ALL, c(4, 5), geom = "point")
 fviz_ellipses(mca_ALL, c(6, 7), geom = "point")
@@ -384,6 +223,11 @@ fviz_ellipses(mca_ALL, 10, geom = "point", palette = "startrek")
 
 
 ggsave("MCA_ellipse.pdf", path = plot)
+
+
+# --- Test
+fviz_mca_var(mca_ALL, choice = "mca.cor", repel = TRUE)
+
 
 # ------------------------------------------------------------- #
 # ---- Alternative ----
