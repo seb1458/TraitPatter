@@ -13,6 +13,7 @@ path <- "~/Schreibtisch/Thesis/data"
 library(tidyverse)
 library(data.table)
 library(taxize)
+library(stringr)
 
 
 # --------------------------------------------------------------------------------------------------------------- #
@@ -136,22 +137,72 @@ setorder(US_trait_DB, Taxa)
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Taxa Information ####
+df_NOA <- US_trait_DB
 
-NOA_fam <- unique(US_trait_DB$Family)
-NOA_fam <- NOA_fam[grepl("dae", NOA_fam)] # One family with no entry
+df_NOA[df_NOA == ""] <- NA
+
+# Merge taxa columns
+df_NOA <- df_NOA %>%
+  mutate(Taxa = coalesce(Taxa, Taxon)) %>%
+  select(-Taxon) %>%
+  select(Family, Genus, Taxa, everything())
+
+head(df_NOA[, 1:5])
+
+# If genus is NA insert first word of taxa column
+df_NOA <- mutate(df_NOA, Genus = ifelse(is.na(Genus), word(Taxa, 1), Genus))
+
+# Remove rows were genus information is family names
+df_NOA <- df_NOA[!grepl("dae$", df_NOA$Genus), ]
+
+# Are family names all availabe?
+df_NOA[is.na(df_NOA$Family), 1:4]
+# Missing family names, but genus names are subfamilies. Dimissed.
+
+df_NOA <- df_NOA[!is.na(df_NOA$Family), ]
+
 
 # Get order levels from "Global Biodiversity Information Facility" (gbif)
+NOA_fam <- unique(df_NOA$Family)
+
 tax_gbif <- get_ids(names = NOA_fam, db = "gbif")
 cl_gbif <- cbind(classification(tax_gbif$gbif, return_id = FALSE)); beep(4)
 cl_gbif <- cl_gbif %>% select(order, family)
 
-US_trait_DB <- merge(cl_gbif, US_trait_DB, by.x = "family", by.y = "Family")
-US_trait_DB <- US_trait_DB %>%
-  select(order, family, Genus, Taxon, everything()) %>%
+df_NOA <- merge(cl_gbif, df_NOA, by.x = "family", by.y = "Family")
+df_NOA <- df_NOA %>%
+  select(order, family, Genus, Taxa, everything()) %>%
   rename(Order = order, Family = family)
 
+# Some order names are missing
+df_NOA <- df_NOA %>%
+  
+  # Nerillidae belongs to Aciculata
+  mutate(Order = ifelse(grepl("Nerillidae", Family), "Aciculata", Order)) %>%
+  
+  # Acroloxidae, Lymnaeidae, Ancylidae, Planorbidae, Physidae belong to Pulmonata
+  mutate(Order = ifelse(grepl("Acroloxidae|Lymnaeidae|Ancylidae|Planorbidae|Physidae", Family), "Pulmonata", Order)) %>%
+  
+  # Pleuroceridae belong to Sorbeoconcha
+  mutate(Order = ifelse(grepl("Pleuroceridae", Family), "Sorbeoconcha", Order)) %>%
+  
+  # Valvatidae belongs to Triganglionata
+  mutate(Order = ifelse(grepl("Valvatidae", Family), "Triganglionata", Order)) %>%
+  
+  # Pilidae belongs to Architaenioglossa
+  mutate(Order = ifelse(grepl("Pilidae", Family), "Architaenioglossa", Order)) %>%
+  
+  # Uchidastygacaridae belongs to Trombidiformes
+  mutate(Order = ifelse(grepl("Uchidastygacaridae", Family), "Trombidiformes", Order)) %>%
+  
+  # Aeolosomatidae no order known (incertae sedis)
+  mutate(Family = ifelse(grepl("Aeolosomatidae", Family), NA, Family)) 
 
+# Select only rows with non-NA in order column
+df_NOA <- df_NOA[!is.na(df_NOA$Order), ]
+
+# Taxonomic information complete
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Write Table ####
-write.table(US_trait_DB, file = "~/Schreibtisch/Thesis/data/North America/macroinvertebrate_NAM_tax.csv", sep = ",")
+write.table(df_NOA, file = "~/Schreibtisch/Thesis/data/North America/macroinvertebrate_NAM_tax.csv", sep = ",")
