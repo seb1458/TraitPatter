@@ -79,10 +79,40 @@ write.table(df_EUR_tax, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebr
 write.table(class_full, file = "~/Schreibtisch/Thesis/data/Europe/full_taxa_EUR.csv", sep = ",")
 
 # --------------------------------------------------------------------------------------------------------------- #
-#### Renaming columns
+#### Find Order Information ####
 
 # Load data
 df_EUR <- read.csv(file.path(path, "Europe", "macroinvertebrate_EUR_tax.csv"), stringsAsFactors = FALSE)
+
+# Missing orders
+df_EUR[is.na(df_EUR$order), 1:4]
+unique(df_EUR[is.na(df_EUR$order), 2]) 
+
+df_EUR <- df_EUR %>%
+  
+  # Nerillidae belongs to Aciculata
+  mutate(order = ifelse(grepl("Nerillidae", family), "Aciculata", order)) %>%
+  
+  # Acroloxidae, Lymnaeidae, Physidae, Planorbidae belong to Pulmonata
+  mutate(order = ifelse(grepl("Acroloxidae|Lymnaeidae|Physidae|Planorbidae", family), "Pulmonata", order)) %>%
+  
+  # Melanopsidae, Thiaridae belong to Sorbeoconcha
+  mutate(order = ifelse(grepl("Melanopsidae|Thiaridae", family), "Sorbeoconcha", order)) %>%
+  
+  # Valvatidae belongs to Triganglionata
+  mutate(order = ifelse(grepl("Valvatidae", family), "AcTriganglionataiculata", order)) %>%
+  
+  # Macrostomidae belongs to Macrostomorpha
+  mutate(order = ifelse(grepl("Macrostomidae", family), "Macrostomorpha", order)) %>%
+  
+  # Aeolosomatidae, Capitellidae, Catenulidae, Stenostomidae: no order known (incertae sedis)
+  mutate(family = ifelse(grepl("Aeolosomatidae|Capitellidae|Catenulidae|Stenostomidae", family), NA, family)) 
+
+# Dismiss family NA
+df_EUR <- df_EUR[!is.na(df_EUR$family), ]
+
+# --------------------------------------------------------------------------------------------------------------- #
+#### Renaming columns ####
 
 # Microhabitat
 names(df_EUR)[grep(c("pel$|arg$|psa$|aka$|mil$|mal$|hpe$|alg$|mph$|pom$|woo$|mad$|oth$"), names(df_EUR))] <- 

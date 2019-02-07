@@ -49,7 +49,6 @@ EU_size <- EU_size %>%
             size_6 = coalesce(size_6.x, size_6.y),
             size_7 = coalesce(size_7.x, size_7.y))
 
-df_EUR <- select(df_EUR, -(size_1:size_7))
 df_EUR <- cbind(df_EUR, EU_size)
 
 
