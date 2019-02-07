@@ -11,6 +11,26 @@ path <- "~/Schreibtisch/Thesis/data"
 #### Packages ####
 library(tidyverse)
 library(purrr)
+library(taxize)
+library(stringr)
+
+
+# --------------------------------------------------------------------------------------------------------------- #
+#### Source Scripts ####
+
+# Preparation of Europe
+source("~/Schreibtisch/Thesis/scripts/europe/trait_pre_EUR.R")
+source("~/Schreibtisch/Thesis/scripts/europe/fuzzy_trans_EUR.R")
+
+# Preparation of North America
+source("~/Schreibtisch/Thesis/scripts/america/trait_pre_NOA.R")
+
+# Preparation of Australia
+source("~/Schreibtisch/Thesis/scripts/australia/trait_pre_AST.R")
+source("~/Schreibtisch/Thesis/scripts/australia/fuzzy_trans_AST.R")
+
+# Trait harmonization
+source("~/Schreibtisch/Thesis/scripts/aggregation/trait_harmonization.R")
 
 
 # --------------------------------------------------------------------------------------------------------------- #
@@ -34,9 +54,6 @@ AUS <- read.csv(file.path(path, "Australia", "macroinvertebrate_AUS_harmonized.c
 #### Europe ####
 names(EUR)
 
-EUR[is.na(EUR$genus), 1:5]
-EUR[is.na(EUR$family), 1:5]
-
 # ---- Replace NAs with zeroes ----
 cols <- purrr::rerun(length(EUR[6:ncol(EUR)]), 0) %>% purrr::set_names(names(EUR[6:ncol(EUR)]))
 EUR <- replace_na(EUR, cols)
@@ -54,7 +71,8 @@ EUR <- select(EUR, order, family, genus, everything())
 EUR <- EUR %>%
   mutate_at(vars(ph_acidic:temp_ind), funs(./Freq)) %>%
   group_by(order, family, genus) %>%
-  summarise_at(vars(ph_acidic:temp_ind), funs(sum))
+  summarise_at(vars(ph_acidic:temp_ind), funs(sum)) %>%
+  ungroup()
 
 # ---- EUR: Aggregate on family level ----
 # Get list of genera frequencies
@@ -69,7 +87,8 @@ EUR <- select(EUR, order, family, genus, everything())
 EUR_agg <- EUR %>%
   mutate_at(vars(ph_acidic:temp_ind), funs(./Freq)) %>%
   group_by(order, family) %>%
-  summarise_at(vars(ph_acidic:temp_ind), funs(sum))
+  summarise_at(vars(ph_acidic:temp_ind), funs(sum)) %>%
+  ungroup()
 
 # Assign binary coding to traits, where maxima get 1, and non-maxima get 0
 for (i in 1:nrow(EUR_agg)) {
@@ -93,6 +112,10 @@ for (i in 1:nrow(EUR_agg)) {
   # Drift
   x <- which(EUR_agg[i, grep("drift_", names(EUR_agg))] != max(EUR_agg[i, grep("drift_", names(EUR_agg))]))
   EUR_agg[i, grep("drift_", names(EUR_agg))[x]] <- 0
+  
+  # Life duration
+  x <- which(EUR_agg[i, grep("life", names(EUR_agg))] != max(EUR_agg[i, grep("life", names(EUR_agg))]))
+  EUR_agg[i, grep("life", names(EUR_agg))[x]] <- 0
   
   # Size
   x <- which(EUR_agg[i, grep("size_", names(EUR_agg))] != max(EUR_agg[i, grep("size_", names(EUR_agg))]))
@@ -140,6 +163,7 @@ trait_fin_EUR <- data.frame(
   locomotion = grep("loc", names(EUR_agg), value = TRUE)[apply(EUR_agg[, grep("loc", names(EUR_agg))], 1, which.max)],
   respiration = grep("resp", names(EUR_agg), value = TRUE)[apply(EUR_agg[, grep("resp", names(EUR_agg))], 1, which.max)],
   drift = grep("drift", names(EUR_agg), value = TRUE)[apply(EUR_agg[, grep("drift", names(EUR_agg))], 1, which.max)],
+  life = grep("life", names(EUR_agg), value = TRUE)[apply(EUR_agg[, grep("life", names(EUR_agg))], 1, which.max)],
   size = grep("size", names(EUR_agg), value = TRUE)[apply(EUR_agg[, grep("size", names(EUR_agg))], 1, which.max)],
   reproduction = grep("rep_", names(EUR_agg), value = TRUE)[apply(EUR_agg[, grep("rep_", names(EUR_agg))], 1, which.max)],
   aquatic_stages = grep("stage", names(EUR_agg), value = TRUE)[apply(EUR_agg[, grep("stage", names(EUR_agg))], 1, which.max)],
@@ -159,6 +183,7 @@ trait_fin_EUR_int <- data.frame(
   locomotion = apply(EUR_agg[, grep("loc", names(EUR_agg))], 1, which.max),
   respiration = apply(EUR_agg[, grep("resp", names(EUR_agg))], 1, which.max),
   drift = apply(EUR_agg[, grep("drift", names(EUR_agg))], 1, which.max),
+  life = apply(EUR_agg[, grep("life", names(EUR_agg))], 1, which.max),
   size = apply(EUR_agg[, grep("size", names(EUR_agg))], 1, which.max),
   reproduction = apply(EUR_agg[, grep("rep_", names(EUR_agg))], 1, which.max),
   aquatic_stages = apply(EUR_agg[, grep("stage", names(EUR_agg))], 1, which.max),
@@ -176,9 +201,9 @@ write.table(trait_fin_EUR_int, file = "~/Schreibtisch/Thesis/data/final/macroinv
 #### North America ####
 names(NAM)
 
-NAM[is.na(NAM$Family), ]
-NAM[is.na(NAM$Genus), ]
-NAM[is.na(NAM$Taxa), ]
+# Lots of genera (442) missing
+NAM <- NAM[!is.na(NAM$Genus), ]
+NAM <- NAM[!is.na(NAM$Family), ]
 
 # ---- Replace NAs with zeroes ----
 cols <- purrr::rerun(length(NAM[6:ncol(NAM)]), 0) %>% purrr::set_names(names(NAM[6:ncol(NAM)]))
@@ -200,7 +225,8 @@ NAM$Freq <- ifelse(is.na(NAM$Freq), 1, NAM$Freq)
 NAM <- NAM %>%
   mutate_at(vars(ph_acidic:temp_ind), funs(./Freq)) %>%
   group_by(Order, Family, Genus) %>%
-  summarise_at(vars(ph_acidic:temp_ind), funs(sum))
+  summarise_at(vars(ph_acidic:temp_ind), funs(sum)) %>%
+  ungroup()
 
 # ---- NAM: Aggregate on family level ----
 # Get list of genera frequencies
@@ -215,7 +241,8 @@ NAM <- select(NAM, Order, Family, Genus, everything())
 NAM_agg <-NAM %>%
   mutate_at(vars(ph_acidic:temp_ind), funs(./Freq)) %>%
   group_by(Order, Family) %>%
-  summarise_at(vars(ph_acidic:temp_ind), funs(sum))
+  summarise_at(vars(ph_acidic:temp_ind), funs(sum)) %>%
+  ungroup()
 
 # Assign binary coding to traits, where maxima get 1, and non-maxima get 0
 for (i in 1:nrow(NAM_agg)) {
@@ -239,6 +266,10 @@ for (i in 1:nrow(NAM_agg)) {
   # Drift
   x <- which(NAM_agg[i, grep("drift_", names(NAM_agg))] != max(NAM_agg[i, grep("drift_", names(NAM_agg))]))
   NAM_agg[i, grep("drift_", names(NAM_agg))[x]] <- 0
+  
+  # Life duration
+  x <- which(NAM_agg[i, grep("life", names(NAM_agg))] != max(NAM_agg[i, grep("life", names(NAM_agg))]))
+  NAM_agg[i, grep("life", names(NAM_agg))[x]] <- 0
   
   # Size
   x <- which(NAM_agg[i, grep("size_", names(NAM_agg))] != max(NAM_agg[i, grep("size_", names(NAM_agg))]))
@@ -284,6 +315,7 @@ trait_fin_NAM <- data.frame(
   locomotion = grep("loc", names(NAM_agg), value = TRUE)[apply(NAM_agg[, grep("loc", names(NAM_agg))], 1, which.max)],
   respiration = grep("resp", names(NAM_agg), value = TRUE)[apply(NAM_agg[, grep("resp", names(NAM_agg))], 1, which.max)],
   drift = grep("drift", names(NAM_agg), value = TRUE)[apply(NAM_agg[, grep("drift", names(NAM_agg))], 1, which.max)],
+  life = grep("life", names(NAM_agg), value = TRUE)[apply(NAM_agg[, grep("life", names(NAM_agg))], 1, which.max)],
   size = grep("size", names(NAM_agg), value = TRUE)[apply(NAM_agg[, grep("size", names(NAM_agg))], 1, which.max)],
   reproduction = grep("rep_", names(NAM_agg), value = TRUE)[apply(NAM_agg[, grep("rep_", names(NAM_agg))], 1, which.max)],
   aquatic_stages = grep("stage", names(NAM_agg), value = TRUE)[apply(NAM_agg[, grep("stage", names(NAM_agg))], 1, which.max)],
@@ -303,6 +335,7 @@ trait_fin_NAM_int <- data.frame(
   locomotion = apply(NAM_agg[, grep("loc", names(NAM_agg))], 1, which.max),
   respiration = apply(NAM_agg[, grep("resp", names(NAM_agg))], 1, which.max),
   drift = apply(NAM_agg[, grep("drift", names(NAM_agg))], 1, which.max),
+  life = apply(NAM_agg[, grep("life", names(NAM_agg))], 1, which.max),
   size = apply(NAM_agg[, grep("size", names(NAM_agg))], 1, which.max),
   reproduction = apply(NAM_agg[, grep("rep_", names(NAM_agg))], 1, which.max),
   aquatic_stages = apply(NAM_agg[, grep("stage", names(NAM_agg))], 1, which.max),
@@ -319,9 +352,7 @@ write.table(trait_fin_NAM_int, file = "~/Schreibtisch/Thesis/data/final/macroinv
 #### Australia ####
 names(AUS)
 
-# Lots of genera names missing
-AUS[is.na(AUS$Genus), ]
-AUS[is.na(AUS$Family), ]
+# Nothing missing
 
 
 # ---- Replace NAs with zeroes ----
@@ -335,16 +366,12 @@ species_freq <- as.data.frame(table(AUS$Genus))
 # Merge with Australian database
 AUS <- merge(AUS, species_freq, by.x = "Genus", by.y = "Var1", all.x = TRUE, sort = FALSE)
 
-AUS <- select(AUS, Order, Family, Genus, everything())
-
-# NAs in AUS$Freq converted to 1 for proper aggregation
-AUS$Freq <- ifelse(is.na(AUS$Freq), 1, AUS$Freq)
-
 # Divide each trait modality by the species frequency and group by family and genus
 AUS <- AUS %>%
   mutate_at(vars(ph_acidic:temp_ind), funs(./Freq)) %>%
   group_by(Order, Family, Genus) %>%
-  summarise_at(vars(ph_acidic:temp_ind), funs(sum))
+  summarise_at(vars(ph_acidic:temp_ind), funs(sum)) %>%
+  ungroup()
 
 # ---- AUS: Aggregate on family level ----
 # Get list of genera frequencies
@@ -359,7 +386,8 @@ AUS <- select(AUS, Order, Family, Genus, everything())
 AUS_agg <-AUS %>%
   mutate_at(vars(ph_acidic:temp_ind), funs(./Freq)) %>%
   group_by(Order, Family) %>%
-  summarise_at(vars(ph_acidic:temp_ind), funs(sum))
+  summarise_at(vars(ph_acidic:temp_ind), funs(sum)) %>%
+  ungroup()
 
 # Assign binary coding to traits, where maxima get 1, and non-maxima get 0
 for (i in 1:nrow(AUS_agg)) {
@@ -383,6 +411,10 @@ for (i in 1:nrow(AUS_agg)) {
   # Drift
   x <- which(AUS_agg[i, grep("drift_", names(AUS_agg))] != max(AUS_agg[i, grep("drift_", names(AUS_agg))]))
   AUS_agg[i, grep("drift_", names(AUS_agg))[x]] <- 0
+  
+  # Life duration
+  x <- which(AUS_agg[i, grep("life", names(AUS_agg))] != max(AUS_agg[i, grep("life", names(AUS_agg))]))
+  AUS_agg[i, grep("life", names(AUS_agg))[x]] <- 0
   
   # Size
   x <- which(AUS_agg[i, grep("size_", names(AUS_agg))] != max(AUS_agg[i, grep("size_", names(AUS_agg))]))
@@ -429,6 +461,7 @@ trait_fin_AUS <- data.frame(
   locomotion = grep("loc", names(AUS_agg), value = TRUE)[apply(AUS_agg[, grep("loc", names(AUS_agg))], 1, which.max)],
   respiration = grep("resp", names(AUS_agg), value = TRUE)[apply(AUS_agg[, grep("resp", names(AUS_agg))], 1, which.max)],
   drift = grep("drift", names(AUS_agg), value = TRUE)[apply(AUS_agg[, grep("drift", names(AUS_agg))], 1, which.max)],
+  life = grep("life", names(AUS_agg), value = TRUE)[apply(AUS_agg[, grep("life", names(AUS_agg))], 1, which.max)],
   size = grep("size", names(AUS_agg), value = TRUE)[apply(AUS_agg[, grep("size", names(AUS_agg))], 1, which.max)],
   reproduction = grep("rep_", names(AUS_agg), value = TRUE)[apply(AUS_agg[, grep("rep_", names(AUS_agg))], 1, which.max)],
   aquatic_stages = grep("stage", names(AUS_agg), value = TRUE)[apply(AUS_agg[, grep("stage", names(AUS_agg))], 1, which.max)],
@@ -449,6 +482,7 @@ trait_fin_AUS_int <- data.frame(
   locomotion = apply(AUS_agg[, grep("loc", names(AUS_agg))], 1, which.max),
   respiration = apply(AUS_agg[, grep("resp", names(AUS_agg))], 1, which.max),
   drift = apply(AUS_agg[, grep("drift", names(AUS_agg))], 1, which.max),
+  life = apply(AUS_agg[, grep("life", names(AUS_agg))], 1, which.max),
   size = apply(AUS_agg[, grep("size", names(AUS_agg))], 1, which.max),
   reproduction = apply(AUS_agg[, grep("rep_", names(AUS_agg))], 1, which.max),
   aquatic_stages = apply(AUS_agg[, grep("stage", names(AUS_agg))], 1, which.max),
@@ -467,7 +501,7 @@ names(EUR_agg); names(NAM_agg); names(AUS_agg)
 
 EUR_agg <- rename(EUR_agg, Family = family, Order = order)
 
-# This table contains all traits and all regions as binary codes
+# This table contains all traits from all regions as binary codes
 ALL_agg <- rbind(EUR_agg, NAM_agg, AUS_agg)
 ALL_agg <- select(ALL_agg, Order, Family, everything())
 
