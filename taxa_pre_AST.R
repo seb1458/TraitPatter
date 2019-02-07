@@ -38,15 +38,18 @@ df_AUS$Order <- coalesce(df_AUS$Order, df_AUS$Order_bugs_gbr, df_AUS$Order_fam_C
 # --- Family + name_in_Schafer + TrueFamily
 df_AUS$Family <- coalesce(df_AUS$Family, df_AUS$name_in_Schafer, df_AUS$TrueFamily)
 
-# --- Genus column
+# --- Genus column: just one column
+
+# --- Genus_and_species + SAName_botwe
+df_AUS$Genus_and_species <- coalesce(df_AUS$Genus_and_species, df_AUS$SAName_botwe)
+
+# Order hierarchically
 df_AUS <- df_AUS %>%
   select(Order, Family, Genus, Genus_and_species, long_code, everything())
 
 # --- Remove rows with all NAs in the taxon and code columns
-df_AUS <- df_AUS[rowSums(is.na(df_AUS[1:5])) < 5, ] 
+df_AUS <- df_AUS[rowSums(is.na(df_AUS[1:5])) < 5, ]
 
-# --- Genus_and_species + SAName_botwe
-df_AUS$Genus_and_species <- coalesce(df_AUS$Genus_and_species, df_AUS$SAName_botwe)
 
 # --- Find and remove duplicated entries in names_AUS$long_code
 df_AUS %>% 
@@ -111,17 +114,6 @@ df_AUS <- df_AUS %>%
 
 
 # --------------------------------------------------------------------------------------------------------------- #
-#### Final Preparation of Taxa Information ####
-# --- Delete incomplete information
-# When NA in Family and long_code: no identification possible
-# df_AUS <- df_AUS %>%
-#   filter(!(is.na(Family) & is.na(long_code)))
-# 
-# --- Strange code data: MITEXXXX dismissed for now
-# names_AUS <- names_AUS[!grepl("mite", names_AUS$long_code, ignore.case = TRUE), ]
-
-
-
 #### Preprocessing Script with data.table ####
 # Trying to resolve crude taxa names
 # differentiate into species column and unresolved taxa
@@ -173,267 +165,222 @@ df_AUS[, `:=`(Species = unlist(Species), Unresolved_taxa = unlist(Unresolved_tax
 
 
 # --------------------------------------------------------------------------------------------------------------- #
-#### Correct wrong entries ####
+#### Dealing with Missing/Wrong Data ####
 
-# --- Order
-levels(as.factor(df_AUS$Order))
-
-df_AUS[grepl("Diplostraca", df_AUS$Order), "Order"] <- "Diplostraca"
-
-# Super Order Syncarida contains two families: Koonungidae (Order: Anaspidacea) and Parabathynellidae (Order: Bathynellacea)
-df_AUS[grepl("Koonungidae", df_AUS$Family), "Order"] <- "Anaspidacea"
-df_AUS[grepl("Parabath", df_AUS$Family), "Order"] <- "Bathynellacea"
-
-# --- Family
-levels(as.factor(df_AUS$Family))
-
-# Correct entries and delete all entries not ending with "-dae"
+# Correct wrong genera names (Extend by first part of species names)
 df_AUS <- df_AUS %>%
-  mutate(Family = ifelse(Family == "Anisoptera (dragonflies)", NA, Family),
-         Family = ifelse(Family == "Arrenuridae (water mite)", "Arrenuridae", Family),
-         Family = ifelse(Family == "Aturidae (water mites)", "Aturidae", Family),
-         Family = ifelse(Family == "Chironomidae: Aphroteniinae" |
-                           Family == "Chironomidae: Chironominae" |
-                           Family == "Chironomidae: Orthocladiinae" |
-                           Family == "Chironomidae: Podonominae" |
-                           Family == "Chironomidae: Tanypodinae",
-                         "Chironomidae", Family),
-         Family = ifelse(Family == "Calocid/Helicophidae", "Helicophidae", Family), 
-         Family = ifelse(Family == "Coenagrionidae (odonata)", "Coenagrionidae", Family),
-         Family = ifelse(Family == "Conoesucidae (Tricoptera)", "Conoesucidae", Family),
-         Family = ifelse(Family == "Gripopterygidae (Plecoptera)", "Gripopterygidae", Family)) %>%
-  mutate(Family = ifelse(!grepl("dae$", df_AUS$Family), NA, df_AUS$Family))
+  mutate(genus_ext = word(Species, 1)) %>%
+  mutate(genus_real = coalesce(genus_ext, Genus)) %>%
+  select(-Genus, -genus_ext) %>%
+  rename(Genus = genus_real) %>%
+  select(Order, Family, Genus, everything())
 
+# Now if genus is NA, no identification possible
+df_AUS <- df_AUS[!is.na(df_AUS$Genus), ]
 
-# --- Genus
-levels(as.factor(df_AUS$Genus))
+# Just five cases where entry for genus exists but family name does not
+# Additionally these genus entries are all order names
+df_AUS[is.na(df_AUS$Family) & !is.na(df_AUS$Genus), 1:5]
+# Delete, because no identification possible
+df_AUS[is.na(df_AUS$Family) & !is.na(df_AUS$Genus), ] <- NA
 
-# Correct entries and delete all entries ending with "-dae" and all nonsense
+# Now if familiy is NA, no identification possible
+df_AUS <- df_AUS[!is.na(df_AUS$Family), ]
+
+# Lot of order names missing, where taxonomic information is available
+df_AUS[is.na(df_AUS$Order) & !is.na(df_AUS$Family) , 1:5]
+# Check again later
+
+# Also wrong information in genus column for some rows:
+# 1. Class, family, subfamily and tribe names
+df_AUS <- df_AUS[!grepl("dae$|inae$|ini$|inea$", df_AUS$Genus), ]
+
+# 2. Nonsense
+df_AUS <- df_AUS[!grepl("Bivalve|crab|^sp|Group|Order|Family|Genus|genus|Mites|Infra|[0-9]|Hel$|grape|dark|light|with",
+                        df_AUS$Genus), ]
+
+# 3. Correct wrong entries
 df_AUS <- df_AUS %>%
-  mutate(Genus = ifelse(grepl("Notriolus", Genus), "Notriolus", Genus),
-         Genus = ifelse(grepl("shuckardi", Genus), "Shuckardi", Genus),
-         Genus = ifelse(grepl("tripunctatus", Genus), "Tripunctatus", Genus),
-         Genus = ifelse(grepl("zealandicus", Genus), "Zealandicus", Genus)) %>%
-  mutate(Genus = ifelse(grepl("^sp|dae$|dea$|[0-9]|Family|Order|with|juveniles|genus|Genus|grape", Genus),
-                        NA, Genus),
-         Genus = ifelse(grepl("Trichoptera|Telmatopelopia|Mites|Plecoptera|Diptera|Isopoda|Coleoptera|Conchostraca|Turbellaria|Neuroptera|Polychaet|Oligochaeta|Pelecypoda|Infra|Odonata", Genus),
-                        NA, Genus))
+  mutate(Genus = ifelse(grepl("Notriolus", Genus), "Notriolus", Genus))
 
-# Lot of subfamily for Chironomidae
-df_AUS <- df_AUS %>%
-  mutate(Family = ifelse(grepl("Chironomini|Tanytarsini|Chironominae|Orthocladiinae|Tanypodinae|Pentaneurini|Podonominae|Diamesinae|Aphroteniinae", Genus), 
-                         "Chironomidae", Family)) %>%
-  mutate(Genus = ifelse(grepl("Chironomini|Tanytarsini|Chironominae|Orthocladiinae|Tanypodinae|Pentaneurini|Podonominae|Diamesinae|Aphroteniinae", Genus), 
-                        NA, Genus))
+# 4. Wrong entries
+df_AUS <- df_AUS[!grepl("Telmatopelopia|Conchostraca", df_AUS$Genus), ]
 
-# --- Species
-df_AUS <- df_AUS %>%
-  mutate(Species = ifelse(grepl("imm|Peza|Unid|juveniles", Species), NA, Species))
+# 5. Dismiss larval stages from database
+df_AUS <- df_AUS[!grepl("I$", df_AUS$long_code), ]
 
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Get Taxonomic Information via taxize ####
 
-# --- Get information for missing order, family and genus
-tax_miss <- df_AUS[which((is.na(df_AUS$Genus)) | (is.na(df_AUS$Family)) | (is.na(df_AUS$Order))),
-                    c("Family", "Genus", "Species", "id_join")]
+# Get taxonomic information  for genera names
+genera_gbif <- unique(df_AUS$Genus)
 
-# --- First: Species information
-# Only non-NA cases
-spec_miss <- tax_miss[!is.na(tax_miss$Species), ]
+# Wrong spelling
+df_AUS[grepl("Helicopysche", df_AUS$Genus), "Genus"] <- "Helicopsyche" 
 
-# Some taxa with multiple names, or label for "Adult"/"Larva"
-spec_miss$Species <- word(spec_miss$Species, start = 1, end = 2)
-spec_miss <- spec_miss[!duplicated(spec_miss$Species), ]
+# Correct names
+genera_gbif <- unique(df_AUS$Genus)
+genera_gbif <- genera_gbif[!grepl("Austrosimulium|Diptera|Compterosmittia", genera_gbif)]
 
-# Remove nonsense like "crab imm", "Peza ops", and taxa containing "juveniles"
-# Also Diaprecoris barycephala and Hydrophilus latipalpus can not be found
-spec_miss <- spec_miss[!grepl("Diaprecoris|latipalpus", spec_miss$Species), ]
+genera_ids <- get_ids(genera_gbif, db = "gbif")
 
-# Get ids from gbif, and classify
-spec_gbif <- spec_miss$Species
-ids_gbif <- get_ids(spec_gbif, db = "gbif")
-class_spec <- cbind(classification(ids_gbif, db= "gbif", return_id = FALSE))
+genera_class <- cbind(classification(genera_ids, db = "gbif"))
 
-tax_spec <- select(class_spec, order, family, genus, species)
-tax_spec$id_join <- spec_miss$id_join
+genera_class <- genera_class %>%
+  select(order, family, genus) %>%
+  rename(order.gbif = order, family.gbif = family)
 
 # Merge with df_AUS
-df_AUS <- merge(x = df_AUS, y = tax_spec, by = "id_join", all.x = TRUE)
+df_AUS <- merge(df_AUS, genera_class, by.x = "Genus", by.y = "genus", all.x = TRUE)
+df_AUS <- select(df_AUS, Order, order.gbif, Family, family.gbif, Genus, everything())
 
-df_AUS <- df_AUS %>%
-  mutate(Order = coalesce(order, Order),
-         Family = coalesce(family, Family),
-         Genus = coalesce(genus, Genus)) %>%
-  select(-c(order:species))
-
-
-# --- Second: Genus information
-gen_miss <- tax_miss[!is.na(tax_miss$Genus), c("Family", "Genus", "id_join")]
-gen_miss$Genus
-
-# Get ids from gbif, and classify
-gen_gbif <- gen_miss$Genus
-ids_gbif <- get_ids(gen_gbif, db = "gbif")
-class_gen <- cbind(classification(ids_gbif, db= "gbif", return_id = FALSE))
-
-tax_gen <- select(class_gen, order, family, genus)
-tax_gen$id_join <- gen_miss$id_join
-
-# Merge with df_AUS
-df_AUS <- merge(x = df_AUS, y = tax_gen, by = "id_join", all.x = TRUE)
-
-df_AUS <- df_AUS %>%
-  mutate(Order = coalesce(order, Order),
-         Family = coalesce(family, Family),
-         Genus = coalesce(genus, Genus)) %>%
-  select(-c(order:genus))
-
-
-# --- Third: Family information
-fam_miss <- tax_miss[!is.na(tax_miss$Family), c("Family", "id_join")]
-
-# Remove family names, nonsense (sp., Order, ...) or wrong categories (Neuroptera, Oligochaeta, ...)
-fam_miss[grepl("Aturidae", fam_miss$Family), 1] <- "Aturidae"
-fam_miss[grepl("(Unident.)", fam_miss$Family), 1] <- "Hymenostomatidae"
-fam_miss[grepl("Calocid/Helicophidae", fam_miss$Family), 1] <- "Helicophidae"
-
-fam_miss <- fam_miss[grepl("dae$", fam_miss$Family), ]
-
-# Get ids from gbif, and classify
-fam_gbif <- fam_miss$Family
-ids_gbif <- get_ids(fam_gbif, db = "gbif")
-class_fam <- cbind(classification(ids_gbif, db= "gbif", return_id = FALSE))
-
-tax_fam <- select(class_fam, order, family)
-tax_fam$id_join <- fam_miss$id_join
-
-# Merge with df_AUS
-df_AUS <- merge(x = df_AUS, y = tax_fam, by = "id_join", all.x = TRUE)
-
-df_AUS <- df_AUS %>%
-  mutate(Order = coalesce(order, Order),
-         Family = coalesce(family, Family)) %>%
-  select(-c(order:family), -id_join)
-
-# ---------------------------------------------------------------------------------------------------------------- #
 # Write .csv 
 # write.table(df_AUS, file = "~/Schreibtisch/Thesis/data/Australia/macroinvertebrate_AUS_tax2.csv", sep = ",")
 
+# --------------------------------------------------------------------------------------------------------------- #
+#### Correct wrong genus entries: Genera names ####
 df_AUS <- read.csv(file.path(path, "Australia", "macroinvertebrate_AUS_tax2.csv"), stringsAsFactors = FALSE)
 
-# Still missing data
-View(df_AUS[which((is.na(df_AUS$Genus)) | (is.na(df_AUS$Family)) | (is.na(df_AUS$Order))), 1:7])
+# Get rows were gbif did not find taxonomic information
+df_AUS[is.na(df_AUS$order.gbif) | is.na(df_AUS$family.gbif), 1:6]
 
-# ------------------------------------------------------- #
-# --- Still missing data
+df_AUS <- df_AUS %>% 
+  # Adversaeschna is a subgenus belonging to Aeshna
+  mutate(order.gbif = ifelse(grepl("Adversaeschna", Genus), "Odonata", order.gbif),
+         family.gbif = ifelse(grepl("Adversaeschna", Genus), "Aeshnidae", family.gbif),
+         Genus = ifelse(grepl("Adversaeschna", Genus), "Aeshna", Genus)) %>%
+  
+  # Alathiria is spelled wrong -> Alathyria
+  # family.gbif: Hyriidae, order: Unionoida
+  mutate(order.gbif = ifelse(grepl("Alathiria", Genus), "Unionoida", order.gbif),
+         family.gbif = ifelse(grepl("Alathiria", Genus), "Hyriidae", family.gbif),
+         Genus = ifelse(grepl("Alathiria", Genus), "Alathyria", Genus)) %>%
+  
+  # Amerianna, Bayardella, Ferrissia, Glyptophysa, Gyraulus, Helicorbis, Isidorella, Planorbarius
+  # belong to Planorbidae family, and to Pulmonata order
+  mutate(order.gbif = ifelse(grepl("Amerianna|Bayardella|Ferrissia|Glyptophysa|Gyraulus|Helicorbis|Isidorella|Planorbarius", Genus), "Pulmonata", order.gbif),
+         family.gbif = ifelse(grepl("Amerianna|Bayardella|Ferrissia|Glyptophysa|Gyraulus|Helicorbis|Isidorella|Planorbarius", Genus), "Planorbidae", family.gbif)) %>%
+  
+  # Austropeplea, Lymnaea belong to Lymnaeidae family and to Pulmonata order
+  mutate(order.gbif = ifelse(grepl("Austropeplea|Lymnaea", Genus), "Pulmonata", order.gbif),
+         family.gbif = ifelse(grepl("Austropeplea|Lymnaea", Genus), "Lymnaeidae", family.gbif)) %>%
+  
+  # Austroaeshna belongs to Aeshnidae family and Odonata order
+  mutate(order.gbif = ifelse(grepl("Austroaeshna", Genus), "Odonata", order.gbif),
+         family.gbif = ifelse(grepl("Austroaeshna", Genus), "Aeshnidae", family.gbif)) %>%
+  
+  # Austrosimulium belongts to Simuliidae family and Diptera order
+  mutate(order.gbif = ifelse(grepl("Austrosimulium", Genus), "Diptera", order.gbif),
+         family.gbif = ifelse(grepl("Austrosimulium", Genus), "Simuliidae", family.gbif)) %>%
+  
+  # Calopsectra belongts to Chironomidae family and Diptera order
+  mutate(order.gbif = ifelse(grepl("Calopsectra", Genus), "Diptera", order.gbif),
+         family.gbif = ifelse(grepl("Calopsectra", Genus), "Chironomidae", family.gbif)) %>%
+  
+  # Diaprecoris belongts to Corixidae family and Hemiptera order
+  mutate(order.gbif = ifelse(grepl("Diaprecoris", Genus), "Hemiptera", order.gbif),
+         family.gbif = ifelse(grepl("Diaprecoris", Genus), "Corixidae", family.gbif)) %>%
+  
+  # Dineutis wrong spelling -> Dineutus
+  mutate(order.gbif = ifelse(grepl("Dineutis", Genus), "Coleoptera", order.gbif),
+         family.gbif = ifelse(grepl("Dineutis", Genus), "Gyrinidae", family.gbif),
+         Genus = ifelse(grepl("Dineutis", Genus), "Dineutus", Genus)) %>%
+  
+  # Flabellifrontipoba is subgenus name, genus is Oxus
+  mutate(order.gbif = ifelse(grepl("Flabellifrontipoba", Genus), "Trombidiformes", order.gbif),
+         family.gbif = ifelse(grepl("Flabellifrontipoba", Genus), "Oxidae", family.gbif),
+         Genus = ifelse(grepl("Flabellifrontipoba", Genus), "Oxus", Genus)) %>%
+  
+  # Glacidorbis belongs to Glacidorbidae family and Triganglionata order
+  mutate(order.gbif = ifelse(grepl("Glacidorbis", Genus), "Triganglionata", order.gbif),
+         family.gbif = ifelse(grepl("Glacidorbis", Genus), "Glacidorbidae", family.gbif)) %>%
+  
+  # Haitia belongs to Lythraceae family and Myrtales order
+  mutate(order.gbif = ifelse(grepl("Haitia", Genus), "Myrtales", order.gbif),
+         family.gbif = ifelse(grepl("Haitia", Genus), "Lythraceae", family.gbif)) %>%
+  
+  # Helicopysche wrong name -> Helicopsyche
+  mutate(Genus = ifelse(grepl("Helicopysche", Genus), "Helicopsyche", Genus)) %>%
+  
+  # Heterolimnesia belongs to Limnesiidae family and Trombidiformes order
+  mutate(order.gbif = ifelse(grepl("Heterolimnesia", Genus), "Trombidiformes", order.gbif),
+         family.gbif = ifelse(grepl("Heterolimnesia", Genus), "Limnesiidae", family.gbif)) %>%
+  
+  # Leptocerid belongs to Leptoceridae family and Trichoptera order
+  mutate(order.gbif = ifelse(grepl("Leptocerid", Genus), "Trichoptera", order.gbif),
+         family.gbif = ifelse(grepl("Leptocerid", Genus), "Leptoceridae", family.gbif)) %>%
+  
+  # Nebiossophlebia wrong name, correct Neboissophlebia
+  mutate(Genus = ifelse(grepl("Nebiossophlebia", Genus), "Neboissophlebia", Genus)) %>%
+  
+  # Paradixa old name, new name is Dixella
+  mutate(order.gbif = ifelse(grepl("Paradixa", Genus), "Diptera", order.gbif),
+         family.gbif = ifelse(grepl("Paradixa", Genus), "Dixidae", family.gbif),
+         Genus = ifelse(grepl("Paradixa", Genus), "Dixella", Genus)) %>%
+  
+  # Physa is wrong genus name -> Physella
+  mutate(order.gbif = ifelse(grepl("Physa", Genus), "Planorboidea", order.gbif),
+         family.gbif = ifelse(grepl("Physa", Genus), "Physidae", family.gbif),
+         Genus = ifelse(grepl("Physa", Genus), "Physella", Genus)) %>%
+  
+  # Plotiopsis belongs to Thiaridae family and Sorbeoconcha order
+  mutate(order.gbif = ifelse(grepl("Plotiopsis", Genus), "Sorbeoconcha", order.gbif),
+         family.gbif = ifelse(grepl("Plotiopsis", Genus), "Thiaridae", family.gbif)) %>%
+  
+  # Wrong spelling for Rhyncaustrobates, correct: Rhynchaustrobates, belonging to Trombidiformes order
+  mutate(order.gbif = ifelse(grepl("Rhyncaustrobates", Genus), "Trombidiformes", order.gbif),
+         Genus = ifelse(grepl("Rhyncaustrobates", Genus), "Rhynchaustrobates", Genus)) %>%
+  
+  # Stylaria belongs to Naididae family and Haplotaxida
+  mutate(order.gbif = ifelse(grepl("Stylaria", Genus), "Haplotaxida", order.gbif),
+         family.gbif = ifelse(grepl("Stylaria", Genus), "Naididae", family.gbif)) %>%
+  
+  # Thiara belongs to Thiaridae family and Sorbeoconcha order
+  mutate(order.gbif = ifelse(grepl("Thiara", Genus), "Sorbeoconcha", order.gbif),
+         family.gbif = ifelse(grepl("Thiara", Genus), "Thiaridae", family.gbif)) %>%
+  
+  # Tubifex belongs to Tubificidae family and Haplotaxida order
+  mutate(order.gbif = ifelse(grepl("Tubifex", Genus), "Haplotaxida", order.gbif),
+         family.gbif = ifelse(grepl("Tubifex", Genus), "Tubificidae", family.gbif))
 
-# --- Genus still with wrong information
-levels(as.factor(df_AUS[which((is.na(df_AUS$Genus)) | (is.na(df_AUS$Family)) | (is.na(df_AUS$Order))), 3]))
+# Dineutus and all other species with two entries for adult and larva, delete larva
+df_AUS <- df_AUS[!grepl("larva", df_AUS$Species, ignore.case = TRUE), ]
 
-# Some Genus names are order names or something else
-# Amphipoda is an order already existing in the order column
-# Astigmata is an order already existing in the order column
-# Lepidoptera is an order name, already existing in the order column
-# Mesostigmata is an order name, already existing in the order column
-# Ephemeroptera is an order name, alread exissting in the order column
+# Higher taxonomic names in genus column: 
+# Amphipoda, Astigmata, Austropelopia, Coleoptera, Crustacea, Diptera, Ephmeroptera, 
+# Gastropoda, Halacaroidea, Hemiptera, Isopoda, Lepidoptera, Mesostigmata, Nemertea,
+# Odonata, Oribatida, Plecoptera, Polychaeta, Polychaete, Syncarida, Trichoptera,
+# Trombidioidea, Turbellaria, Zygoptera, Pygmanisus -> No identification possible
+high_tax <- c("Amphipoda", "Astigmata", "Austropelopia", "Coleoptera", "Crustacea", "Diptera", "Ephmeroptera", 
+              "Gastropoda", "Halacaroidea", "Hemiptera", "Isopoda", "Lepidoptera", "Mesostigmata", "Nemertea",
+              "Odonata", "Oribatida", "Plecoptera", "Polychaeta", "Polychaete", "Syncarida", "Trichoptera",
+              "Trombidioidea", "Turbellaria", "Zygoptera", "Pygmanisus", "Nematoda", "Nematomorpha")
+
+df_AUS <- df_AUS[!(df_AUS$Genus %in% high_tax), ]
+
+
+# --------------------------------------------------------------------------------------------------------------- #
+#### Correct wrong genus entries: Order names ####
+sort(levels(as.factor(df_AUS$Order)))
+
+df_AUS[grepl("Diplo", df_AUS$Order), 1] <- "Diplostraca"
+
+
+# --------------------------------------------------------------------------------------------------------------- #
+#### Final Merge ####
+names(df_AUS)[1:6]
+
 df_AUS <- df_AUS %>%
-  mutate(Genus = ifelse(grepl("Amphipoda|Astigmata|Hemiptera|Lepidoptera|Mesostigmata|Ephemeroptera", Genus),
-       NA, Genus))
+  mutate(order.new = coalesce(order.gbif, Order),
+         family.new = coalesce(family.gbif, Family)) %>%
+  select(-c(Order, order.gbif, Family, family.gbif)) %>%
+  rename(Order = order.new, Family = family.new) %>%
+  select(Order, Family, everything())
 
+# Everything complete
+df_AUS[is.na(df_AUS$Genus) | is.na(df_AUS$Family) | is.na(df_AUS$Order), 1:5]
 
-# Gastropoda is a class name
-# Crustacea is a phylum
-# Ectoprocta is a phylum
-# Nematoda is a phylum name
-# Nematomorpha is a phylum name
-# Nemertea is a phylum name
-df_AUS <- df_AUS %>%
-  mutate(Genus = ifelse(grepl("Gastropoda|Crustacea|Ectoprocta|Nematoda|Nematomorpha|Nemertea", Genus), NA, Genus)) %>%
-  mutate(Family = ifelse(grepl("Crustacea", Family), NA, Family)) 
-
-
-# Austropeplea, Bayardella, Ferrissia, Glyptophysa, Gyraulus, Helicorbis, Isidorella, Physa, Pseudosuccinea
-# are genus names, belonging to Pulmonata order
-df_AUS <- df_AUS %>%
-  mutate(Order = ifelse(grepl("Austropeplea|Bayardella|Ferrissia|Glyptophysa|Gyraulus|Helicorbis|Isidorella|Physa|Pseudosuccinea", Genus),
-                        "Pulmonata", Order))
-
-
-# Plotiopsis is genus name, belonging to Sorbeoconcha order
-df_AUS[grepl("Plotiopsis", df_AUS$Genus), "Order"] <- "Sorbeoconcha"
-
-# Syncardia does no exist, order Super Order Syncarida is also not sufficient for identification -> Delete
-df_AUS <- df_AUS[!grepl("Syncardia", df_AUS$Genus), ]
-
-# Zygoptera is suborder name
-df_AUS <- df_AUS %>%
-  mutate(Genus = ifelse(grepl("Zygoptera", Genus), NA, Genus))
-
-# Physa belongs to Physidae family
-df_AUS <- df_AUS %>%
-  mutate(Family = ifelse(grepl("Physa", Genus), "Physidae", Family))
-
-
-# --- Family still with wrong information
-levels(as.factor(df_AUS[which((is.na(df_AUS$Family)) | (is.na(df_AUS$Order))), 2]))
-
-# Aeolosomatidae, order unknown
-df_AUS[grepl("Aeolosomatidae", df_AUS$Family), 1:6]
-
-# Capitellidae, order unknown
-df_AUS[grepl("Capitellidae", df_AUS$Family), 1:6]
-
-# Glacidorbidae: order is Triganglionata
-df_AUS <- df_AUS %>%
-  mutate(Order = ifelse(grepl("Glacidorbidae", Family), "Triganglionata", Order))
-
-
-# --- Correct order names
-levels(as.factor(df_AUS$Order))
-
-# Passeriformes wrong order
-df_AUS[grepl("Passeriformes", df_AUS$Order), ] <- NA
-
-# Anthoathecatae wrong spelling
-df_AUS <- df_AUS %>%
-  mutate(Order = ifelse(grepl("Anthoathecatae", Order), "Anthoathecata", Order))
-
-# Basommatophora is suborder, order is Pulmonata
-df_AUS <- df_AUS %>%
-  mutate(Order = ifelse(grepl("Basommatophora", Order), "Pulmonata", Order))
-
-# Gordioidea wrong name, order is Gordea
-df_AUS <- df_AUS %>%
-  mutate(Order = ifelse(grepl("Gordioidea", Order), "Gordea", Order))
-
-# Hoplonemertea is suborder, 
-df_AUS <- df_AUS %>%
-  mutate(Order = ifelse(grepl("Hoplonemertea", Order), "Monostilifera", Order))
-
-# Hygrophila wrong order, Families Lymnaeidae, Physidae and Planorbidae belong to Pulmonata
-df_AUS <- df_AUS %>%
-  mutate(Order = ifelse(grepl("Hygrophila", Order), "Pulmonata", Order))
-
-# Hypsogastropoda, Littorinimorpha wrong name, order is Sorbeoconcha
-# But also genera with wrong families
-df_AUS <- df_AUS %>%
-  mutate(Order = ifelse(grepl("Hypsogastropoda|Littorinimorpha|Neogastropoda", Order), "Sorbeoconcha", Order)) %>%
-  mutate(Family = ifelse(grepl("Austropyrgus|Posticobia|Potamopyrgus|Angrobia", Genus), "Hydrobiidae", Family),
-         Family = ifelse(grepl("Glacidorbis", Genus), "Glacidorbidae", Family))
-
-
-# --- Remove rows with:
-# 1. All NAs in taxonomic columns
-df_AUS <- df_AUS[!rowSums(is.na(df_AUS[1:4])) == 4, ]
-
-# 2. All rows with only order name
-df_AUS <- df_AUS[!rowSums(is.na(df_AUS[2:4])) == 3, ]
-
-# 3. All rows with only order and family name
-df_AUS <- df_AUS[!rowSums(is.na(df_AUS[3:4])) == 2, ]
-
-# Taxonomic information is complete
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Final Table ####
