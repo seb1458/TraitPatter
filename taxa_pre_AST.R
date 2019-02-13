@@ -361,14 +361,28 @@ df_AUS <- df_AUS[!(df_AUS$Genus %in% high_tax), ]
 
 
 # --------------------------------------------------------------------------------------------------------------- #
+#### Correct wrong genus entries: Family names ####
+sort(levels(as.factor(df_AUS$Family)))
+
+df_AUS[!grepl("idae$", df_AUS$Family), 1:5]
+
+# Oligochaeta is wrong
+df_AUS <- df_AUS[-grep("Oligochaeta", df_AUS$Family), ]
+
+# Wrong entry in family and genus column
+df_AUS <- df_AUS[!grepl("EPHEMEROPTERA", df_AUS$Family), ] 
+
+# --------------------------------------------------------------------------------------------------------------- #
 #### Correct wrong genus entries: Order names ####
 sort(levels(as.factor(df_AUS$Order)))
 
 df_AUS[grepl("Diplo", df_AUS$Order), 1] <- "Diplostraca"
 
+df_AUS[is.na(df_AUS$order.gbif), 1:5]
+df_AUS[is.na(df_AUS$Order), 1:5]
 
 # --------------------------------------------------------------------------------------------------------------- #
-#### Final Merge ####
+#### Final Steps ####
 names(df_AUS)[1:6]
 
 df_AUS <- df_AUS %>%

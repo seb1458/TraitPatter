@@ -544,13 +544,22 @@ size <- size %>%
 aquatic <- fin_AUS[grepl("Aquatic", names(fin_AUS))] 
 
 aquatic <- aquatic %>%
-  rename(aquatic_egg = Aquatic_eggs_VicEPA,
-         aquatic_nymph = Aquatic_nymph_VicEPA,
-         aquatic_larva = Aquatic_larva_VicEPA,
-         aquatic_pupa = Aquatic_pupa_VicEPA,
-         aquatic_adult = Aquatic_imago_adult_VicEPA)
+  rename(stage_egg = Aquatic_eggs_VicEPA,
+         stage_nymph = Aquatic_nymph_VicEPA,
+         stage_larva = Aquatic_larva_VicEPA,
+         stage_pupa = Aquatic_pupa_VicEPA,
+         stage_adult = Aquatic_imago_adult_VicEPA) %>%
+  mutate(stage_larva = coalesce(stage_larva, stage_nymph)) %>%
+  select(-stage_nymph) %>%
+  mutate(stage_egg.new = ifelse(!is.na(stage_egg) & is.na(stage_larva) & is.na(stage_pupa) & is.na(stage_adult), 1, NA),
+         stage_larva.new = ifelse(!is.na(stage_egg) & !is.na(stage_larva) & is.na(stage_pupa) & is.na(stage_adult), 1, NA),
+         stage_pupa.new = ifelse(!is.na(stage_egg) & !is.na(stage_larva) & !is.na(stage_pupa) & is.na(stage_adult), 1, NA),
+         stage_adult.new = ifelse(!is.na(stage_egg) & !is.na(stage_larva) & !is.na(stage_pupa) & !is.na(stage_adult), 1, NA)) %>%
+  select(-c(stage_egg:stage_adult)) %>%
+  rename(aquatic_egg = stage_egg.new, aquatic_larva = stage_larva.new, aquatic_pupa = stage_pupa.new, aquatic_adult = stage_adult.new)
 
 
+# --------------------------------------------------------------------------------------------------------------- #
 # NOTE: Information about emergence flight, resistance form, saprobity and dissemination strategy
 # are not included in any database!
 
