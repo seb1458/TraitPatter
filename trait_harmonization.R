@@ -18,7 +18,7 @@ EUR <- read.csv(file.path(path, "Europe", "macroinvertebrate_EUR.csv"))
 NAM <- read.csv(file.path(path, "North America", "macroinvertebrate_NAM_trait.csv")) 
 AUS <- read.csv(file.path(path, "Australia", "macroinvertebrate_AUS.csv")) 
 
-fin_EUR <- select(EUR, order:Taxon)
+fin_EUR <- select(EUR, order:species)
 fin_NAM <- select(NAM, Order:Taxa)
 fin_AUS <- select(AUS, Order:Species)
 
@@ -350,9 +350,9 @@ volt_AUS <- AUS %>%
 # ---- Aquatic Stages ----
 # Modalities: 
 # stage1: egg
-# stage2: larva and/or nymph
-# stage3: pupa
-# stage4: adult
+# stage2: egg, larva and/or nymph
+# stage3: egg, larva, pupa
+# stage4: egg, larva, pupa, adult
 
 # Aquatic stages for larvae and nymphae of EUR and AUS are combined into one column
 
@@ -363,7 +363,7 @@ grep("stage", names(EUR), ignore.case = TRUE, value = TRUE)
 stage_EUR <- EUR %>%
   mutate_all(as.integer) %>%
   mutate(stage1 = stage_egg,
-         stage2 = coalesce(stage_larva, stage_nymph),
+         stage2 = stage_larva,
          stage3 = stage_pupa,
          stage4 = stage_adult) %>%
   select(stage1:stage4)
@@ -383,15 +383,10 @@ grep("aquatic", names(AUS), ignore.case = TRUE, value = TRUE)
 
 stage_AUS <- AUS %>%
   mutate_all(as.integer) %>%
-  rename(stage_egg = aquatic_egg,
-         stage_larva = aquatic_larva,
-         stage_nymph = aquatic_nymph,
-         stage_pupa = aquatic_pupa,
-         stage_adult = aquatic_adult) %>%
-  mutate(stage1 = stage_egg,
-         stage2 = coalesce(stage_larva, stage_nymph),
-         stage3 = stage_pupa,
-         stage4 = stage_adult) %>%
+  rename(stage1 = aquatic_egg,
+         stage2 = aquatic_larva,
+         stage3 = aquatic_pupa,
+         stage4 = aquatic_adult) %>%
   select(stage1:stage4)
 
 

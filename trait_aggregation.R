@@ -41,7 +41,6 @@ NAM <- read.csv(file.path(path, "North America", "macroinvertebrate_NAM_harmoniz
 
 AUS <- read.csv(file.path(path, "Australia", "macroinvertebrate_AUS_harmonized.csv")) 
 
-
 # --------------------------------------------------------------------------------------------------------------- #
 # Aggregation Process
 # 
@@ -55,8 +54,8 @@ AUS <- read.csv(file.path(path, "Australia", "macroinvertebrate_AUS_harmonized.c
 names(EUR)
 
 # ---- Replace NAs with zeroes ----
-cols <- purrr::rerun(length(EUR[6:ncol(EUR)]), 0) %>% purrr::set_names(names(EUR[6:ncol(EUR)]))
-EUR <- replace_na(EUR, cols)
+# cols <- purrr::rerun(length(EUR[6:ncol(EUR)]), 0) %>% purrr::set_names(names(EUR[6:ncol(EUR)]))
+# EUR <- replace_na(EUR, cols)
 
 # ---- EUR: Aggregate on genus level ---- 
 # Get list of species frequencies
@@ -71,7 +70,7 @@ EUR <- select(EUR, order, family, genus, everything())
 EUR <- EUR %>%
   mutate_at(vars(ph_acidic:temp_ind), funs(./Freq)) %>%
   group_by(order, family, genus) %>%
-  summarise_at(vars(ph_acidic:temp_ind), funs(sum)) %>%
+  summarise_at(vars(ph_acidic:temp_ind), funs(sum(., na.rm = TRUE))) %>%
   ungroup()
 
 # ---- EUR: Aggregate on family level ----
@@ -87,66 +86,131 @@ EUR <- select(EUR, order, family, genus, everything())
 EUR_agg <- EUR %>%
   mutate_at(vars(ph_acidic:temp_ind), funs(./Freq)) %>%
   group_by(order, family) %>%
-  summarise_at(vars(ph_acidic:temp_ind), funs(sum)) %>%
+  summarise_at(vars(ph_acidic:temp_ind), funs(sum(., na.rm = TRUE))) %>%
   ungroup()
 
-# Assign binary coding to traits, where maxima get 1, and non-maxima get 0
-for (i in 1:nrow(EUR_agg)) {
-  
-  # pH 
-  x <- which(EUR_agg[i, grep("ph_", names(EUR_agg))] != max(EUR_agg[i, grep("ph_", names(EUR_agg))]))
-  EUR_agg[i, grep("ph_", names(EUR_agg))[x]] <- 0
-  
-  # Feeding mode
-  x <- which(EUR_agg[i, grep("feed_", names(EUR_agg))] != max(EUR_agg[i, grep("feed_", names(EUR_agg))]))
-  EUR_agg[i, grep("feed_", names(EUR_agg))[x]] <- 0
-  
-  # Locomotion
-  x <- which(EUR_agg[i, grep("loc_", names(EUR_agg))] != max(EUR_agg[i, grep("loc_", names(EUR_agg))]))
-  EUR_agg[i, grep("loc_", names(EUR_agg))[x]] <- 0
-  
-  # Respiration
-  x <- which(EUR_agg[i, grep("resp_", names(EUR_agg))] != max(EUR_agg[i, grep("resp_", names(EUR_agg))]))
-  EUR_agg[i, grep("resp_", names(EUR_agg))[x]] <- 0
-  
-  # Drift
-  x <- which(EUR_agg[i, grep("drift_", names(EUR_agg))] != max(EUR_agg[i, grep("drift_", names(EUR_agg))]))
-  EUR_agg[i, grep("drift_", names(EUR_agg))[x]] <- 0
-  
-  # Life duration
-  x <- which(EUR_agg[i, grep("life", names(EUR_agg))] != max(EUR_agg[i, grep("life", names(EUR_agg))]))
-  EUR_agg[i, grep("life", names(EUR_agg))[x]] <- 0
-  
-  # Size
-  x <- which(EUR_agg[i, grep("size_", names(EUR_agg))] != max(EUR_agg[i, grep("size_", names(EUR_agg))]))
-  EUR_agg[i, grep("size_", names(EUR_agg))[x]] <- 0
-  
-  # Voltinism
-  x <- which(EUR_agg[i, grep("volt", names(EUR_agg))] != max(EUR_agg[i, grep("volt", names(EUR_agg))]))
-  EUR_agg[i, grep("volt", names(EUR_agg))[x]] <- 0
-  
-  # Aquatic stages
-  x <- which(EUR_agg[i, grep("stage", names(EUR_agg))] != max(EUR_agg[i, grep("stage", names(EUR_agg))]))
-  EUR_agg[i, grep("stage", names(EUR_agg))[x]] <- 0
-  
-  # Reproduction
-  x <- which(EUR_agg[i, grep("rep_", names(EUR_agg))] != max(EUR_agg[i, grep("rep_", names(EUR_agg))]))
-  EUR_agg[i, grep("rep_", names(EUR_agg))[x]] <- 0
-  
-  # Temperature
-  x <- which(EUR_agg[i, grep("temp_", names(EUR_agg))] != max(EUR_agg[i, grep("temp_", names(EUR_agg))]))
-  EUR_agg[i, grep("temp_", names(EUR_agg))[x]] <- 0
-}
 
-# Other values are maxima
+# pH preference
+EUR_agg$ph_max <- apply(EUR_agg[, grep("ph_", names(EUR_agg))], 1, max, na.rm = TRUE)
+
 EUR_agg <- EUR_agg %>%
-  mutate_at(vars(ph_acidic:temp_ind), funs(replace(., . != 0, 1))) %>%
-  
-  # Add regions column
-  mutate(region = "EUR") %>%
-  select(family, region, everything())
+  mutate(ph_acidic = ifelse(ph_acidic == ph_max, 1, NA),
+         ph_normal = ifelse(ph_normal == ph_max & is.na(ph_acidic), 1, NA)) %>%
+  select(-ph_max)
 
-EUR_agg <- EUR_agg[!is.na(EUR_agg$family), ]
+# Feeding mode
+EUR_agg$feed_max <- apply(EUR_agg[, grep("feed_", names(EUR_agg))], 1, max, na.rm = TRUE)
+EUR_agg$feed_max <- ifelse(EUR_agg$feed_max == 0, NA, EUR_agg$feed_max)
+
+EUR_agg <- EUR_agg %>%
+  mutate(feed_shredder = ifelse(feed_shredder == feed_max, 1, NA),
+         feed_gatherer = ifelse(feed_gatherer == feed_max & is.na(feed_shredder), 1, NA),
+         feed_filter = ifelse(feed_filter == feed_max & is.na(feed_shredder) & is.na(feed_gatherer), 1, NA),
+         feed_scraper = ifelse(feed_scraper == feed_max & is.na(feed_shredder) & is.na(feed_gatherer) & is.na(feed_filter), 1, NA),
+         feed_predator = ifelse(feed_predator == feed_max & is.na(feed_shredder) & is.na(feed_gatherer) & is.na(feed_filter) & is.na(feed_scraper), 1, NA),
+         feed_parasite = ifelse(feed_parasite == feed_max & is.na(feed_shredder) & is.na(feed_gatherer) & is.na(feed_filter) & is.na(feed_scraper) & is.na(feed_predator), 1, NA)) %>%
+  select(-feed_max)
+
+# Locomotion
+EUR_agg$loc_max <- apply(EUR_agg[, grep("loc_", names(EUR_agg))], 1, max, na.rm = TRUE)
+EUR_agg$loc_max <- ifelse(EUR_agg$loc_max == 0, NA, EUR_agg$loc_max)
+
+EUR_agg <- EUR_agg %>%
+  mutate(loc_skate = ifelse(loc_skate == loc_max, 1, NA),
+         loc_swim = ifelse(loc_swim == loc_max & is.na(loc_skate), 1, NA),
+         loc_burrow = ifelse(loc_burrow == loc_max & is.na(loc_skate) & is.na(loc_swim), 1, NA),
+         loc_sprawl = ifelse(loc_sprawl == loc_max & is.na(loc_skate) & is.na(loc_swim) & is.na(loc_burrow), 1, NA),
+         loc_sessil = ifelse(loc_sessil == loc_max & is.na(loc_skate) & is.na(loc_swim) & is.na(loc_burrow) & is.na(loc_sprawl), 1, NA)) %>%
+  select(-loc_max)
+
+# Respiration
+EUR_agg$resp_max <- apply(EUR_agg[, grep("resp_", names(EUR_agg))], 1, max, na.rm = TRUE)
+EUR_agg$resp_max <- ifelse(EUR_agg$resp_max == 0, NA, EUR_agg$resp_max)
+
+EUR_agg <- EUR_agg %>%
+  mutate(resp_tegument = ifelse(resp_tegument == resp_max, 1, NA),
+         resp_gills = ifelse(resp_gills == resp_max & is.na(resp_tegument), 1, NA),
+         resp_spiracle = ifelse(resp_spiracle == resp_max & is.na(resp_tegument) & is.na(resp_gills), 1, NA),
+         resp_plastron = ifelse(resp_plastron == resp_max & is.na(resp_tegument) & is.na(resp_gills) & is.na(resp_spiracle), 1, NA),
+         resp_atmospheric = ifelse(resp_atmospheric == resp_max & is.na(resp_tegument) & is.na(resp_gills) & is.na(resp_spiracle) & is.na(resp_plastron), 1, NA)) %>%
+  select(-resp_max)
+
+# Drift
+EUR_agg$drift_max <- apply(EUR_agg[, grep("drift_", names(EUR_agg))], 1, max, na.rm = TRUE)
+EUR_agg$drift_max <- ifelse(EUR_agg$drift_max == 0, NA, EUR_agg$drift_max)
+
+EUR_agg <- EUR_agg %>%
+  mutate(drift_low = ifelse(drift_low == drift_max, 1, NA),
+         drift_high = ifelse(drift_high == drift_max & is.na(drift_low), 1, NA)) %>%
+  select(-drift_max)
+
+# Life duration
+EUR_agg$life_max <- apply(EUR_agg[, grep("life", names(EUR_agg))], 1, max, na.rm = TRUE)
+EUR_agg$life_max <- ifelse(EUR_agg$life_max == 0, NA, EUR_agg$life_max)
+
+EUR_agg <- EUR_agg %>%
+  mutate(life1 = ifelse(life1 == life_max, 1, NA),
+         life2 = ifelse(life2 == life_max & is.na(life1), 1, NA)) %>%
+  select(-life_max)
+
+# Size
+EUR_agg$size_max <- apply(EUR_agg[, grep("size_", names(EUR_agg))], 1, max, na.rm = TRUE)
+EUR_agg$size_max <- ifelse(EUR_agg$size_max == 0, NA, EUR_agg$size_max)
+
+EUR_agg <- EUR_agg %>%
+  mutate(size_small = ifelse(size_small == size_max, 1, NA),
+         size_medium = ifelse(size_medium == size_max & is.na(size_small), 1, NA),
+         size_large = ifelse(size_large == size_max & is.na(size_small) & is.na(size_medium), 1, NA)) %>%
+  select(-size_max)
+
+# Voltinism
+EUR_agg$volt_max <- apply(EUR_agg[, grep("volt", names(EUR_agg))], 1, max, na.rm = TRUE)
+EUR_agg$volt_max <- ifelse(EUR_agg$volt_max == 0, NA, EUR_agg$volt_max)
+
+EUR_agg <- EUR_agg %>%
+  mutate(volt1 = ifelse(volt1 == volt_max, 1, NA),
+         volt2 = ifelse(volt2 == volt_max & is.na(volt1), 1, NA),
+         volt3 = ifelse(volt3 == volt_max & is.na(volt1) & is.na(volt2), 1, NA)) %>%
+  select(-volt_max)
+
+# Aquatic stages
+EUR_agg$stage_max <- apply(EUR_agg[, grep("stage", names(EUR_agg))], 1, max, na.rm = TRUE)
+EUR_agg$stage_max <- ifelse(EUR_agg$stage_max == 0, NA, EUR_agg$stage_max)
+
+EUR_agg <- EUR_agg %>%
+  mutate(stage1 = ifelse(stage1 == stage_max, 1, NA),
+         stage2 = ifelse(stage2 == stage_max & is.na(stage1), 1, NA),
+         stage3 = ifelse(stage3 == stage_max & is.na(stage1) & is.na(stage2), 1, NA),
+         stage4 = ifelse(stage4 == stage_max & is.na(stage1) & is.na(stage2) & is.na(stage3), 1, NA)) %>%
+  select(-stage_max)
+
+# Reproduction
+EUR_agg$rep_max <- apply(EUR_agg[, grep("rep_", names(EUR_agg))], 1, max, na.rm = TRUE)
+EUR_agg$rep_max <- ifelse(EUR_agg$rep_max == 0, NA, EUR_agg$rep_max)
+
+EUR_agg <- EUR_agg %>%
+  mutate(rep_aqu = ifelse(rep_aqu == rep_max, 1, NA),
+         rep_ter = ifelse(rep_ter == rep_max & is.na(rep_aqu), 1, NA),
+         rep_ovo = ifelse(rep_ovo == rep_max & is.na(rep_aqu) & is.na(rep_ter), 1, NA)) %>%
+  select(-rep_max)
+
+# Temperature preference
+EUR_agg$temp_max <- apply(EUR_agg[, grep("temp_", names(EUR_agg))], 1, max, na.rm = TRUE)
+EUR_agg$temp_max <- ifelse(EUR_agg$temp_max == 0, NA, EUR_agg$temp_max)
+
+EUR_agg <- EUR_agg %>%
+  mutate(temp_very_cold = ifelse(temp_very_cold == temp_max, 1, NA),
+         temp_cold = ifelse(temp_cold == temp_max & is.na(temp_very_cold), 1, NA),
+         temp_mod = ifelse(temp_mod == temp_max & is.na(temp_very_cold) & is.na(temp_cold), 1, NA),
+         temp_warm = ifelse(temp_warm == temp_max & is.na(temp_very_cold) & is.na(temp_cold) & is.na(temp_mod), 1, NA),
+         temp_ind = ifelse(temp_ind == temp_max & is.na(temp_very_cold) & is.na(temp_cold) & is.na(temp_mod) & is.na(temp_warm), 1, NA)) %>%
+  select(-temp_max)
+
+# Add region column
+EUR_agg <- EUR_agg %>%
+  mutate(region = "EUR") %>%
+  select(order, family, region, everything())
+
 
 # ---- EUR: Get modalities for the maxima ----
 # Replace NAs with zeroes
@@ -201,13 +265,9 @@ write.table(trait_fin_EUR_int, file = "~/Schreibtisch/Thesis/data/final/macroinv
 #### North America ####
 names(NAM)
 
-# Lots of genera (442) missing
-NAM <- NAM[!is.na(NAM$Genus), ]
-NAM <- NAM[!is.na(NAM$Family), ]
-
 # ---- Replace NAs with zeroes ----
-cols <- purrr::rerun(length(NAM[6:ncol(NAM)]), 0) %>% purrr::set_names(names(NAM[6:ncol(NAM)]))
-NAM <- replace_na(NAM, cols)
+# cols <- purrr::rerun(length(NAM[6:ncol(NAM)]), 0) %>% purrr::set_names(names(NAM[6:ncol(NAM)]))
+# NAM <- replace_na(NAM, cols)
 
 # ---- NAM: Aggregate on genus level ---- 
 # Get list of species frequencies
@@ -225,7 +285,7 @@ NAM$Freq <- ifelse(is.na(NAM$Freq), 1, NAM$Freq)
 NAM <- NAM %>%
   mutate_at(vars(ph_acidic:temp_ind), funs(./Freq)) %>%
   group_by(Order, Family, Genus) %>%
-  summarise_at(vars(ph_acidic:temp_ind), funs(sum)) %>%
+  summarise_at(vars(ph_acidic:temp_ind), funs(sum(., na.rm = TRUE))) %>%
   ungroup()
 
 # ---- NAM: Aggregate on family level ----
@@ -241,64 +301,129 @@ NAM <- select(NAM, Order, Family, Genus, everything())
 NAM_agg <-NAM %>%
   mutate_at(vars(ph_acidic:temp_ind), funs(./Freq)) %>%
   group_by(Order, Family) %>%
-  summarise_at(vars(ph_acidic:temp_ind), funs(sum)) %>%
+  summarise_at(vars(ph_acidic:temp_ind), funs(sum(., na.rm = TRUE))) %>%
   ungroup()
 
-# Assign binary coding to traits, where maxima get 1, and non-maxima get 0
-for (i in 1:nrow(NAM_agg)) {
-  
-  # pH 
-  x <- which(NAM_agg[i, grep("ph_", names(NAM_agg))] != max(NAM_agg[i, grep("ph_", names(NAM_agg))]))
-  NAM_agg[i, grep("ph_", names(NAM_agg))[x]] <- 0
-  
-  # Feeding mode
-  x <- which(NAM_agg[i, grep("feed_", names(NAM_agg))] != max(NAM_agg[i, grep("feed_", names(NAM_agg))]))
-  NAM_agg[i, grep("feed_", names(NAM_agg))[x]] <- 0
-  
-  # Locomotion
-  x <- which(NAM_agg[i, grep("loc_", names(NAM_agg))] != max(NAM_agg[i, grep("loc_", names(NAM_agg))]))
-  NAM_agg[i, grep("loc_", names(NAM_agg))[x]] <- 0
-  
-  # Respiration
-  x <- which(NAM_agg[i, grep("resp_", names(NAM_agg))] != max(NAM_agg[i, grep("resp_", names(NAM_agg))]))
-  NAM_agg[i, grep("resp_", names(NAM_agg))[x]] <- 0
-  
-  # Drift
-  x <- which(NAM_agg[i, grep("drift_", names(NAM_agg))] != max(NAM_agg[i, grep("drift_", names(NAM_agg))]))
-  NAM_agg[i, grep("drift_", names(NAM_agg))[x]] <- 0
-  
-  # Life duration
-  x <- which(NAM_agg[i, grep("life", names(NAM_agg))] != max(NAM_agg[i, grep("life", names(NAM_agg))]))
-  NAM_agg[i, grep("life", names(NAM_agg))[x]] <- 0
-  
-  # Size
-  x <- which(NAM_agg[i, grep("size_", names(NAM_agg))] != max(NAM_agg[i, grep("size_", names(NAM_agg))]))
-  NAM_agg[i, grep("size_", names(NAM_agg))[x]] <- 0
-  
-  # Voltinism
-  x <- which(NAM_agg[i, grep("volt", names(NAM_agg))] != max(NAM_agg[i, grep("volt", names(NAM_agg))]))
-  NAM_agg[i, grep("volt", names(NAM_agg))[x]] <- 0
-  
-  # Aquatic stages
-  x <- which(NAM_agg[i, grep("stage", names(NAM_agg))] != max(NAM_agg[i, grep("stage", names(NAM_agg))]))
-  NAM_agg[i, grep("stage", names(NAM_agg))[x]] <- 0
-  
-  # Reproduction
-  x <- which(NAM_agg[i, grep("rep_", names(NAM_agg))] != max(NAM_agg[i, grep("rep_", names(NAM_agg))]))
-  NAM_agg[i, grep("rep_", names(NAM_agg))[x]] <- 0
-  
-  # Temperature
-  x <- which(NAM_agg[i, grep("temp_", names(NAM_agg))] != max(NAM_agg[i, grep("temp_", names(NAM_agg))]))
-  NAM_agg[i, grep("temp_", names(NAM_agg))[x]] <- 0
-}
+# pH preference
+NAM_agg$ph_max <- apply(NAM_agg[, grep("ph_", names(NAM_agg))], 1, max, na.rm = TRUE)
 
-# Other values are maxima
 NAM_agg <- NAM_agg %>%
-  mutate_at(vars(ph_acidic:temp_ind), funs(replace(., . != 0, 1))) %>%
-  
-  # Add regions column
+  mutate(ph_acidic = ifelse(ph_acidic == ph_max, 1, NA),
+         ph_normal = ifelse(ph_normal == ph_max & is.na(ph_acidic), 1, NA)) %>%
+  select(-ph_max)
+
+# Feeding mode
+NAM_agg$feed_max <- apply(NAM_agg[, grep("feed_", names(NAM_agg))], 1, max, na.rm = TRUE)
+NAM_agg$feed_max <- ifelse(NAM_agg$feed_max == 0, NA, NAM_agg$feed_max)
+
+NAM_agg <- NAM_agg %>%
+  mutate(feed_shredder = ifelse(feed_shredder == feed_max, 1, NA),
+         feed_gatherer = ifelse(feed_gatherer == feed_max & is.na(feed_shredder), 1, NA),
+         feed_filter = ifelse(feed_filter == feed_max & is.na(feed_shredder) & is.na(feed_gatherer), 1, NA),
+         feed_scraper = ifelse(feed_scraper == feed_max & is.na(feed_shredder) & is.na(feed_gatherer) & is.na(feed_filter), 1, NA),
+         feed_predator = ifelse(feed_predator == feed_max & is.na(feed_shredder) & is.na(feed_gatherer) & is.na(feed_filter) & is.na(feed_scraper), 1, NA),
+         feed_parasite = ifelse(feed_parasite == feed_max & is.na(feed_shredder) & is.na(feed_gatherer) & is.na(feed_filter) & is.na(feed_scraper) & is.na(feed_predator), 1, NA)) %>%
+  select(-feed_max)
+
+# Locomotion
+NAM_agg$loc_max <- apply(NAM_agg[, grep("loc_", names(NAM_agg))], 1, max, na.rm = TRUE)
+NAM_agg$loc_max <- ifelse(NAM_agg$loc_max == 0, NA, NAM_agg$loc_max)
+
+NAM_agg <- NAM_agg %>%
+  mutate(loc_skate = ifelse(loc_skate == loc_max, 1, NA),
+         loc_swim = ifelse(loc_swim == loc_max & is.na(loc_skate), 1, NA),
+         loc_burrow = ifelse(loc_burrow == loc_max & is.na(loc_skate) & is.na(loc_swim), 1, NA),
+         loc_sprawl = ifelse(loc_sprawl == loc_max & is.na(loc_skate) & is.na(loc_swim) & is.na(loc_burrow), 1, NA),
+         loc_sessil = ifelse(loc_sessil == loc_max & is.na(loc_skate) & is.na(loc_swim) & is.na(loc_burrow) & is.na(loc_sprawl), 1, NA)) %>%
+  select(-loc_max)
+
+# Respiration
+NAM_agg$resp_max <- apply(NAM_agg[, grep("resp_", names(NAM_agg))], 1, max, na.rm = TRUE)
+NAM_agg$resp_max <- ifelse(NAM_agg$resp_max == 0, NA, NAM_agg$resp_max)
+
+NAM_agg <- NAM_agg %>%
+  mutate(resp_tegument = ifelse(resp_tegument == resp_max, 1, NA),
+         resp_gills = ifelse(resp_gills == resp_max & is.na(resp_tegument), 1, NA),
+         resp_spiracle = ifelse(resp_spiracle == resp_max & is.na(resp_tegument) & is.na(resp_gills), 1, NA),
+         resp_plastron = ifelse(resp_plastron == resp_max & is.na(resp_tegument) & is.na(resp_gills) & is.na(resp_spiracle), 1, NA),
+         resp_atmospheric = ifelse(resp_atmospheric == resp_max & is.na(resp_tegument) & is.na(resp_gills) & is.na(resp_spiracle) & is.na(resp_plastron), 1, NA)) %>%
+  select(-resp_max)
+
+# Drift
+NAM_agg$drift_max <- apply(NAM_agg[, grep("drift_", names(NAM_agg))], 1, max, na.rm = TRUE)
+NAM_agg$drift_max <- ifelse(NAM_agg$drift_max == 0, NA, NAM_agg$drift_max)
+
+NAM_agg <- NAM_agg %>%
+  mutate(drift_low = ifelse(drift_low == drift_max, 1, NA),
+         drift_high = ifelse(drift_high == drift_max & is.na(drift_low), 1, NA)) %>%
+  select(-drift_max)
+
+# Life duration
+NAM_agg$life_max <- apply(NAM_agg[, grep("life", names(NAM_agg))], 1, max, na.rm = TRUE)
+NAM_agg$life_max <- ifelse(NAM_agg$life_max == 0, NA, NAM_agg$life_max)
+
+NAM_agg <- NAM_agg %>%
+  mutate(life1 = ifelse(life1 == life_max, 1, NA),
+         life2 = ifelse(life2 == life_max & is.na(life1), 1, NA)) %>%
+  select(-life_max)
+
+# Size
+NAM_agg$size_max <- apply(NAM_agg[, grep("size_", names(NAM_agg))], 1, max, na.rm = TRUE)
+NAM_agg$size_max <- ifelse(NAM_agg$size_max == 0, NA, NAM_agg$size_max)
+
+NAM_agg <- NAM_agg %>%
+  mutate(size_small = ifelse(size_small == size_max, 1, NA),
+         size_medium = ifelse(size_medium == size_max & is.na(size_small), 1, NA),
+         size_large = ifelse(size_large == size_max & is.na(size_small) & is.na(size_medium), 1, NA)) %>%
+  select(-size_max)
+
+# Voltinism
+NAM_agg$volt_max <- apply(NAM_agg[, grep("volt", names(NAM_agg))], 1, max, na.rm = TRUE)
+NAM_agg$volt_max <- ifelse(NAM_agg$volt_max == 0, NA, NAM_agg$volt_max)
+
+NAM_agg <- NAM_agg %>%
+  mutate(volt1 = ifelse(volt1 == volt_max, 1, NA),
+         volt2 = ifelse(volt2 == volt_max & is.na(volt1), 1, NA),
+         volt3 = ifelse(volt3 == volt_max & is.na(volt1) & is.na(volt2), 1, NA)) %>%
+  select(-volt_max)
+
+# Aquatic stages
+NAM_agg$stage_max <- apply(NAM_agg[, grep("stage", names(NAM_agg))], 1, max, na.rm = TRUE)
+NAM_agg$stage_max <- ifelse(NAM_agg$stage_max == 0, NA, NAM_agg$stage_max)
+
+NAM_agg <- NAM_agg %>%
+  mutate(stage1 = ifelse(stage1 == stage_max, 1, NA),
+         stage2 = ifelse(stage2 == stage_max & is.na(stage1), 1, NA),
+         stage3 = ifelse(stage3 == stage_max & is.na(stage1) & is.na(stage2), 1, NA),
+         stage4 = ifelse(stage4 == stage_max & is.na(stage1) & is.na(stage2) & is.na(stage3), 1, NA)) %>%
+  select(-stage_max)
+
+# Reproduction
+NAM_agg$rep_max <- apply(NAM_agg[, grep("rep_", names(NAM_agg))], 1, max, na.rm = TRUE)
+NAM_agg$rep_max <- ifelse(NAM_agg$rep_max == 0, NA, NAM_agg$rep_max)
+
+NAM_agg <- NAM_agg %>%
+  mutate(rep_aqu = ifelse(rep_aqu == rep_max, 1, NA),
+         rep_ter = ifelse(rep_ter == rep_max & is.na(rep_aqu), 1, NA),
+         rep_ovo = ifelse(rep_ovo == rep_max & is.na(rep_aqu) & is.na(rep_ter), 1, NA)) %>%
+  select(-rep_max)
+
+# Temperature preference
+NAM_agg$temp_max <- apply(NAM_agg[, grep("temp_", names(NAM_agg))], 1, max, na.rm = TRUE)
+NAM_agg$temp_max <- ifelse(NAM_agg$temp_max == 0, NA, NAM_agg$temp_max)
+
+NAM_agg <- NAM_agg %>%
+  mutate(temp_very_cold = ifelse(temp_very_cold == temp_max, 1, NA),
+         temp_cold = ifelse(temp_cold == temp_max & is.na(temp_very_cold), 1, NA),
+         temp_mod = ifelse(temp_mod == temp_max & is.na(temp_very_cold) & is.na(temp_cold), 1, NA),
+         temp_warm = ifelse(temp_warm == temp_max & is.na(temp_very_cold) & is.na(temp_cold) & is.na(temp_mod), 1, NA),
+         temp_ind = ifelse(temp_ind == temp_max & is.na(temp_very_cold) & is.na(temp_cold) & is.na(temp_mod) & is.na(temp_warm), 1, NA)) %>%
+  select(-temp_max)
+
+# Add region column
+NAM_agg <- NAM_agg %>%
   mutate(region = "NAM") %>%
-  select(Family, region, everything())
+  select(Order, Family, region, everything())
 
 # ---- NAM: Get modalities for the maxima ----
 # Replace NAs with zeroes
@@ -370,7 +495,7 @@ AUS <- merge(AUS, species_freq, by.x = "Genus", by.y = "Var1", all.x = TRUE, sor
 AUS <- AUS %>%
   mutate_at(vars(ph_acidic:temp_ind), funs(./Freq)) %>%
   group_by(Order, Family, Genus) %>%
-  summarise_at(vars(ph_acidic:temp_ind), funs(sum)) %>%
+  summarise_at(vars(ph_acidic:temp_ind), funs(sum(., na.rm = TRUE))) %>%
   ungroup()
 
 # ---- AUS: Aggregate on family level ----
@@ -386,64 +511,129 @@ AUS <- select(AUS, Order, Family, Genus, everything())
 AUS_agg <-AUS %>%
   mutate_at(vars(ph_acidic:temp_ind), funs(./Freq)) %>%
   group_by(Order, Family) %>%
-  summarise_at(vars(ph_acidic:temp_ind), funs(sum)) %>%
+  summarise_at(vars(ph_acidic:temp_ind), funs(sum(., na.rm = TRUE))) %>%
   ungroup()
 
-# Assign binary coding to traits, where maxima get 1, and non-maxima get 0
-for (i in 1:nrow(AUS_agg)) {
-  
-  # pH 
-  x <- which(AUS_agg[i, grep("ph_", names(AUS_agg))] != max(AUS_agg[i, grep("ph_", names(AUS_agg))]))
-  AUS_agg[i, grep("ph_", names(AUS_agg))[x]] <- 0
-  
-  # Feeding mode
-  x <- which(AUS_agg[i, grep("feed_", names(AUS_agg))] != max(AUS_agg[i, grep("feed_", names(AUS_agg))]))
-  AUS_agg[i, grep("feed_", names(AUS_agg))[x]] <- 0
-  
-  # Locomotion
-  x <- which(AUS_agg[i, grep("loc_", names(AUS_agg))] != max(AUS_agg[i, grep("loc_", names(AUS_agg))]))
-  AUS_agg[i, grep("loc_", names(AUS_agg))[x]] <- 0
-  
-  # Respiration
-  x <- which(AUS_agg[i, grep("resp_", names(AUS_agg))] != max(AUS_agg[i, grep("resp_", names(AUS_agg))]))
-  AUS_agg[i, grep("resp_", names(AUS_agg))[x]] <- 0
-  
-  # Drift
-  x <- which(AUS_agg[i, grep("drift_", names(AUS_agg))] != max(AUS_agg[i, grep("drift_", names(AUS_agg))]))
-  AUS_agg[i, grep("drift_", names(AUS_agg))[x]] <- 0
-  
-  # Life duration
-  x <- which(AUS_agg[i, grep("life", names(AUS_agg))] != max(AUS_agg[i, grep("life", names(AUS_agg))]))
-  AUS_agg[i, grep("life", names(AUS_agg))[x]] <- 0
-  
-  # Size
-  x <- which(AUS_agg[i, grep("size_", names(AUS_agg))] != max(AUS_agg[i, grep("size_", names(AUS_agg))]))
-  AUS_agg[i, grep("size_", names(AUS_agg))[x]] <- 0
-  
-  # Voltinism
-  x <- which(AUS_agg[i, grep("volt", names(AUS_agg))] != max(AUS_agg[i, grep("volt", names(AUS_agg))]))
-  AUS_agg[i, grep("volt", names(AUS_agg))[x]] <- 0
-  
-  # Aquatic stages
-  x <- which(AUS_agg[i, grep("stage", names(AUS_agg))] != max(AUS_agg[i, grep("stage", names(AUS_agg))]))
-  AUS_agg[i, grep("stage", names(AUS_agg))[x]] <- 0
-  
-  # Reproduction
-  x <- which(AUS_agg[i, grep("rep_", names(AUS_agg))] != max(AUS_agg[i, grep("rep_", names(AUS_agg))]))
-  AUS_agg[i, grep("rep_", names(AUS_agg))[x]] <- 0
-  
-  # Temperature
-  x <- which(AUS_agg[i, grep("temp_", names(AUS_agg))] != max(AUS_agg[i, grep("temp_", names(AUS_agg))]))
-  AUS_agg[i, grep("temp_", names(AUS_agg))[x]] <- 0
-}
+# pH preference
+AUS_agg$ph_max <- apply(AUS_agg[, grep("ph_", names(AUS_agg))], 1, max, na.rm = TRUE)
 
-# Other values are maxima
 AUS_agg <- AUS_agg %>%
-  mutate_at(vars(ph_acidic:temp_ind), funs(replace(., . != 0, 1))) %>%
-  
-  # Add regions column
+  mutate(ph_acidic = ifelse(ph_acidic == ph_max, 1, NA),
+         ph_normal = ifelse(ph_normal == ph_max & is.na(ph_acidic), 1, NA)) %>%
+  select(-ph_max)
+
+# Feeding mode
+AUS_agg$feed_max <- apply(AUS_agg[, grep("feed_", names(AUS_agg))], 1, max, na.rm = TRUE)
+AUS_agg$feed_max <- ifelse(AUS_agg$feed_max == 0, NA, AUS_agg$feed_max)
+
+AUS_agg <- AUS_agg %>%
+  mutate(feed_shredder = ifelse(feed_shredder == feed_max, 1, NA),
+         feed_gatherer = ifelse(feed_gatherer == feed_max & is.na(feed_shredder), 1, NA),
+         feed_filter = ifelse(feed_filter == feed_max & is.na(feed_shredder) & is.na(feed_gatherer), 1, NA),
+         feed_scraper = ifelse(feed_scraper == feed_max & is.na(feed_shredder) & is.na(feed_gatherer) & is.na(feed_filter), 1, NA),
+         feed_predator = ifelse(feed_predator == feed_max & is.na(feed_shredder) & is.na(feed_gatherer) & is.na(feed_filter) & is.na(feed_scraper), 1, NA),
+         feed_parasite = ifelse(feed_parasite == feed_max & is.na(feed_shredder) & is.na(feed_gatherer) & is.na(feed_filter) & is.na(feed_scraper) & is.na(feed_predator), 1, NA)) %>%
+  select(-feed_max)
+
+# Locomotion
+AUS_agg$loc_max <- apply(AUS_agg[, grep("loc_", names(AUS_agg))], 1, max, na.rm = TRUE)
+AUS_agg$loc_max <- ifelse(AUS_agg$loc_max == 0, NA, AUS_agg$loc_max)
+
+AUS_agg <- AUS_agg %>%
+  mutate(loc_skate = ifelse(loc_skate == loc_max, 1, NA),
+         loc_swim = ifelse(loc_swim == loc_max & is.na(loc_skate), 1, NA),
+         loc_burrow = ifelse(loc_burrow == loc_max & is.na(loc_skate) & is.na(loc_swim), 1, NA),
+         loc_sprawl = ifelse(loc_sprawl == loc_max & is.na(loc_skate) & is.na(loc_swim) & is.na(loc_burrow), 1, NA),
+         loc_sessil = ifelse(loc_sessil == loc_max & is.na(loc_skate) & is.na(loc_swim) & is.na(loc_burrow) & is.na(loc_sprawl), 1, NA)) %>%
+  select(-loc_max)
+
+# Locomotion
+AUS_agg$resp_max <- apply(AUS_agg[, grep("resp_", names(AUS_agg))], 1, max, na.rm = TRUE)
+AUS_agg$resp_max <- ifelse(AUS_agg$resp_max == 0, NA, AUS_agg$resp_max)
+
+AUS_agg <- AUS_agg %>%
+  mutate(resp_tegument = ifelse(resp_tegument == resp_max, 1, NA),
+         resp_gills = ifelse(resp_gills == resp_max & is.na(resp_tegument), 1, NA),
+         resp_spiracle = ifelse(resp_spiracle == resp_max & is.na(resp_tegument) & is.na(resp_gills), 1, NA),
+         resp_plastron = ifelse(resp_plastron == resp_max & is.na(resp_tegument) & is.na(resp_gills) & is.na(resp_spiracle), 1, NA),
+         resp_atmospheric = ifelse(resp_atmospheric == resp_max & is.na(resp_tegument) & is.na(resp_gills) & is.na(resp_spiracle) & is.na(resp_plastron), 1, NA)) %>%
+  select(-resp_max)
+
+# Drift
+AUS_agg$drift_max <- apply(AUS_agg[, grep("drift_", names(AUS_agg))], 1, max, na.rm = TRUE)
+AUS_agg$drift_max <- ifelse(AUS_agg$drift_max == 0, NA, AUS_agg$drift_max)
+
+AUS_agg <- AUS_agg %>%
+  mutate(drift_low = ifelse(drift_low == drift_max, 1, NA),
+         drift_high = ifelse(drift_high == drift_max & is.na(drift_low), 1, NA)) %>%
+  select(-drift_max)
+
+# Life duration
+AUS_agg$life_max <- apply(AUS_agg[, grep("life", names(AUS_agg))], 1, max, na.rm = TRUE)
+AUS_agg$life_max <- ifelse(AUS_agg$life_max == 0, NA, AUS_agg$life_max)
+
+AUS_agg <- AUS_agg %>%
+  mutate(life1 = ifelse(life1 == life_max, 1, NA),
+         life2 = ifelse(life2 == life_max & is.na(life1), 1, NA)) %>%
+  select(-life_max)
+
+# Size
+AUS_agg$size_max <- apply(AUS_agg[, grep("size_", names(AUS_agg))], 1, max, na.rm = TRUE)
+AUS_agg$size_max <- ifelse(AUS_agg$size_max == 0, NA, AUS_agg$size_max)
+
+AUS_agg <- AUS_agg %>%
+  mutate(size_small = ifelse(size_small == size_max, 1, NA),
+         size_medium = ifelse(size_medium == size_max & is.na(size_small), 1, NA),
+         size_large = ifelse(size_large == size_max & is.na(size_small) & is.na(size_medium), 1, NA)) %>%
+  select(-size_max)
+
+# Voltinism
+AUS_agg$volt_max <- apply(AUS_agg[, grep("volt", names(AUS_agg))], 1, max, na.rm = TRUE)
+AUS_agg$volt_max <- ifelse(AUS_agg$volt_max == 0, NA, AUS_agg$volt_max)
+
+AUS_agg <- AUS_agg %>%
+  mutate(volt1 = ifelse(volt1 == volt_max, 1, NA),
+         volt2 = ifelse(volt2 == volt_max & is.na(volt1), 1, NA),
+         volt3 = ifelse(volt3 == volt_max & is.na(volt1) & is.na(volt2), 1, NA)) %>%
+  select(-volt_max)
+
+# Aquatic stages
+AUS_agg$stage_max <- apply(AUS_agg[, grep("stage", names(AUS_agg))], 1, max, na.rm = TRUE)
+AUS_agg$stage_max <- ifelse(AUS_agg$stage_max == 0, NA, AUS_agg$stage_max)
+
+AUS_agg <- AUS_agg %>%
+  mutate(stage1 = ifelse(stage1 == stage_max, 1, NA),
+         stage2 = ifelse(stage2 == stage_max & is.na(stage1), 1, NA),
+         stage3 = ifelse(stage3 == stage_max & is.na(stage1) & is.na(stage2), 1, NA),
+         stage4 = ifelse(stage4 == stage_max & is.na(stage1) & is.na(stage2) & is.na(stage3), 1, NA)) %>%
+  select(-stage_max)
+
+# Reproduction
+AUS_agg$rep_max <- apply(AUS_agg[, grep("rep_", names(AUS_agg))], 1, max, na.rm = TRUE)
+AUS_agg$rep_max <- ifelse(AUS_agg$rep_max == 0, NA, AUS_agg$rep_max)
+
+AUS_agg <- AUS_agg %>%
+  mutate(rep_aqu = ifelse(rep_aqu == rep_max, 1, NA),
+         rep_ter = ifelse(rep_ter == rep_max & is.na(rep_aqu), 1, NA),
+         rep_ovo = ifelse(rep_ovo == rep_max & is.na(rep_aqu) & is.na(rep_ter), 1, NA)) %>%
+  select(-rep_max)
+
+# Temperature preference
+AUS_agg$temp_max <- apply(AUS_agg[, grep("temp_", names(AUS_agg))], 1, max, na.rm = TRUE)
+AUS_agg$temp_max <- ifelse(AUS_agg$temp_max == 0, NA, AUS_agg$temp_max)
+
+AUS_agg <- AUS_agg %>%
+  mutate(temp_very_cold = ifelse(temp_very_cold == temp_max, 1, NA),
+         temp_cold = ifelse(temp_cold == temp_max & is.na(temp_very_cold), 1, NA),
+         temp_mod = ifelse(temp_mod == temp_max & is.na(temp_very_cold) & is.na(temp_cold), 1, NA),
+         temp_warm = ifelse(temp_warm == temp_max & is.na(temp_very_cold) & is.na(temp_cold) & is.na(temp_mod), 1, NA),
+         temp_ind = ifelse(temp_ind == temp_max & is.na(temp_very_cold) & is.na(temp_cold) & is.na(temp_mod) & is.na(temp_warm), 1, NA)) %>%
+  select(-temp_max)
+
+# Add region column
+AUS_agg <- AUS_agg %>%
   mutate(region = "AUS") %>%
-  select(Family, region, everything())
+  select(Order, Family, region, everything())
 
 
 # ---- AUS: Get modalities for the maxima ----
