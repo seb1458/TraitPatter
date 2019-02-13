@@ -35,9 +35,11 @@ df_EUR <- select(df_EUR, -grep("microhab_|current_|^sal_|^res_|oxy_|dissem_|emer
 # pH, feeding mode, locomotion, respiration, drift, life duration, size, voltinism, aquatic stages
 
 names(df_EUR)
+df_EUR[5:ncol(df_EUR)] %>% mutate_all(as.factor) %>% sapply(levels)
+
 
 # ---- 1. Replace NAs with zeroes ----
-cols <- purrr::rerun(length(df_EUR[6:ncol(df_EUR)]), 0) %>% purrr::set_names(names(df_EUR[6:ncol(df_EUR)]))
+cols <- purrr::rerun(length(df_EUR[5:ncol(df_EUR)]), 0) %>% purrr::set_names(names(df_EUR[5:ncol(df_EUR)]))
 df_EUR <- replace_na(df_EUR, cols)
 
 
@@ -60,9 +62,7 @@ df_EUR <- df_EUR %>%
 df_EUR <- df_EUR %>%
   
   # pH
-  mutate(ph_acidic = ifelse(ph_acidic == ph_max & ph_acidic != 0, 1, NA),
-         ph_neutral_alk = ifelse(ph_neutral_alk == ph_max & ph_neutral_alk != 0, 1, NA),
-         ph_ind = ifelse(ph_ind == ph_max & ph_ind != 0, 1, NA)) %>%
+  # Already binary
   
   # Temperature
   mutate(temp_very_cold = ifelse(temp_very_cold == temp_max & temp_very_cold != 0, 1, NA),
@@ -92,39 +92,22 @@ df_EUR <- df_EUR %>%
          locom_other = ifelse(locom_other == loc_max & locom_other != 0, 1, NA)) %>%
   
   # Respiration
-  mutate(resp_teg = ifelse(resp_teg == resp_max & resp_teg != 0, 1, NA),
-         resp_gil = ifelse(resp_gil == resp_max & resp_gil != 0, 1, NA),
-         resp_pls = ifelse(resp_pls == resp_max & resp_pls != 0, 1, NA),
-         resp_spi = ifelse(resp_spi == resp_max & resp_spi != 0, 1, NA),
-         resp_ves = ifelse(resp_ves == resp_max & resp_ves != 0, 1, NA),
-         resp_tap = ifelse(resp_tap == resp_max & resp_tap != 0, 1, NA),
-         resp_sur = ifelse(resp_sur == resp_max & resp_sur != 0, 1, NA)) %>%
+  # Already binary
   
   # Dispersal
-  mutate(dispersal_high = ifelse(dispersal_high == drift_max & dispersal_high != 0, 1, NA),
-         dispersal_low = ifelse(dispersal_low == drift_max & dispersal_low != 0, 1, NA)) %>%
+  # Already binary
   
   # Life duration
-  mutate(lifedur_one_yr = ifelse(lifedur_one_yr == life_max & lifedur_one_yr != 0, 1, NA),
-         lifedur_more_yr = ifelse(lifedur_more_yr == life_max & lifedur_more_yr != 0, 1, NA)) %>%
+  # Already binary
   
   # Aquatic stages
   mutate(stage_egg = ifelse(stage_egg == stage_max & stage_egg != 0, 1, NA),
          stage_larva = ifelse(stage_larva == stage_max & stage_larva != 0, 1, NA),
-         stage_nymph = ifelse(stage_nymph == stage_max & stage_nymph != 0, 1, NA),
          stage_pupa = ifelse(stage_pupa == stage_max & stage_pupa != 0, 1, NA),
          stage_adult = ifelse(stage_adult == stage_max & stage_adult != 0, 1, NA)) %>%
   
   # Reproduction
-  mutate(rep_ovovipar = ifelse(rep_ovovipar == rep_max & rep_ovovipar != 0, 1, NA),
-         rep_egg_free_iso = ifelse(rep_egg_free_iso == rep_max & rep_egg_free_iso != 0, 1, NA),
-         rep_egg_cem_iso = ifelse(rep_egg_cem_iso == rep_max & rep_egg_cem_iso != 0, 1, NA),
-         rep_clutch_fixed = ifelse(rep_clutch_fixed == rep_max & rep_clutch_fixed != 0, 1, NA),
-         rep_clutch_free = ifelse(rep_clutch_free == rep_max & rep_clutch_free != 0, 1, NA),
-         rep_clutch_veg = ifelse(rep_clutch_veg == rep_max & rep_clutch_veg != 0, 1, NA),
-         rep_clutch_ter = ifelse(rep_clutch_ter == rep_max & rep_clutch_ter != 0, 1, NA),
-         rep_asexual = ifelse(rep_asexual == rep_max & rep_asexual != 0, 1, NA),
-         rep_parasitic = ifelse(rep_parasitic == rep_max & rep_parasitic != 0, 1, NA)) %>%
+  # Already binary
   
   # Size
   mutate(size_1 = ifelse(size_1 == size_max & size_1 != 0, 1, NA),
@@ -136,9 +119,7 @@ df_EUR <- df_EUR %>%
          size_7 = ifelse(size_7 == size_max & size_7 != 0, 1, NA)) %>%
   
   # Voltinism
-  mutate(volt_1 = ifelse(volt_1 == volt_max & volt_1 != 0, 1, NA),
-         volt_2 = ifelse(volt_2 == volt_max & volt_2 != 0, 1, NA),
-         volt_3 = ifelse(volt_3 == volt_max & volt_3 != 0, 1, NA)) %>%
+  # Already binary
   
   # Delete columns with the respective maximum
   select(-(ph_max:stage_max)) %>%
@@ -150,5 +131,4 @@ df_EUR <- df_EUR %>%
 # --------------------------------------------------------------------------------------------------------------- #
 #### Final Table ####
 # Write .csv
-
 write.table(df_EUR, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR.csv", sep = ",")

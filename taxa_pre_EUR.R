@@ -44,51 +44,117 @@ df_EUR$Taxon <- str_trim(gsub(paste0(del, collapse = "|"), "", df_EUR$Taxon))
 library(taxize)
 library(beepr)
 
-# Two Species can not be found in the gbif database. 
-# 1. Lepidostoma doehleri is missing. Belongs to the family Lepidostoma.
-# 2. Holostomis phalaenoides is also known as Phryganea phalaenoides (https://eprints.lib.hokudai.ac.jp/dspace/bitstream/2115/22222/1/2_P1-6.pdf).
-spec_gbif <- df_EUR$Taxon[df_EUR$Taxon != "Lepidostoma doehleri" & df_EUR$Taxon != "Holostomis phalaenoides"]
-spec_nbn <- c("Lepidostoma doehleri", "Phryganea phalaenoides")
+# One species is unknown (Holostomis phalaenoides)
+# Holostomis phalaenoides is also known as Phryganea phalaenoides (https://eprints.lib.hokudai.ac.jp/dspace/bitstream/2115/22222/1/2_P1-6.pdf).
+df_EUR[grepl("Holostomis", df_EUR$Taxon), 2] <- "Phryganea phalaenoides"
 
-# Get family and genus levels from "Global Biodiversity Information Facility" (gbif)
-tax_gbif <- get_ids(names = spec_gbif, db = "gbif")
-cl_gbif <- cbind(classification(tax_gbif$gbif, return_id = FALSE)); beep(4)
-cl_gbif <- cl_gbif %>% select(order, family, genus, species)
+# Genera column
+df_EUR <- df_EUR %>%
+  mutate(Genus = word(Taxon, 1)) %>%
+  select(Genus, Taxon, everything())
 
-# Get missing family and genus levels from "National Biodiversity Network" (nbn)
-tax_nbn <- get_ids(names = spec_nbn, db = "nbn")
-cl_nbn <- cbind(classification(tax_nbn$nbn, return_id = FALSE))
-cl_nbn$species <- spec_nbn
-cl_nbn <- cl_nbn %>% select(order, family, genus, species)
+# Extract genera names
+genera <- unique(df_EUR$Genus)
 
-# Combine all necessary taxa info (order, family, genus) into one dataframe
-class_full <- rbind(cl_gbif, cl_nbn)
-tail(class_full)
+# Get IDs from GBIF
+gen_ids <- get_ids(genera, db = "gbif")
+gen_class <- cbind(classification(gen_ids, return_id = FALSE)); beep(4)
 
-# Return to 
-class_full <- class_full[c(1:366, 3924, 367:871, 3925, 872:3923), ]
+# Extract relevant taxonomic information
+gen_class <- select(gen_class, order, family, genus)
 
-df_EUR_tax <- cbind(df_EUR, class_full)
-df_EUR_tax <- df_EUR_tax %>%
-  select(order:species, everything(), -X)
+# Merge with European database
+df_EUR <- merge(df_EUR, gen_class, by.x = "Genus", by.y = "genus", all.x = TRUE)
+
+# Order columns
+df_EUR <- df_EUR %>%
+  select(order, family, everything(), -X) %>%
+  rename(species = Taxon)
+
+# Missing orders and families
+df_EUR[is.na(df_EUR$family) | is.na(df_EUR$order), 1:4]
+
+# Identification with species names possible?
+species <- df_EUR[is.na(df_EUR$family) | is.na(df_EUR$order), 4]
+
+spec_ids <- get_ids(species, db = "gbif")
+spec_class <- cbind(classification(spec_ids, return_id = FALSE)); beep(4)
+
+# Extract relevant taxonomic information
+spec_class <- select(spec_class, order, family, genus, species)
+
+# Merge with European database
+df_EUR <- merge(df_EUR, spec_class, by = "species", all.x = TRUE)
+
+# Coalesce information from taxonomic columns
+df_EUR <- df_EUR %>%
+  mutate(order = coalesce(order.y, order.x),
+         family = coalesce(family.y, family.x),
+         genus.new = coalesce(genus, Genus)) %>%
+  select(order, family, genus.new, everything(), -order.x, -order.y, -family.x, -family.y, -Genus, -genus) %>%
+  rename(genus = genus.new)
 
 # Save dataframe with full taxa information
-write.table(df_EUR_tax, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR_tax.csv", sep = ",")
+write.table(df_EUR, file = "~/Schreibtisch/Thesis/data/Europe/macroinvertebrate_EUR_tax.csv", sep = ",")
 
-# Save taxa information for convenience
-write.table(class_full, file = "~/Schreibtisch/Thesis/data/Europe/full_taxa_EUR.csv", sep = ",")
 
 # --------------------------------------------------------------------------------------------------------------- #
-#### Find Order Information ####
+#### Find Missing Information ####
 
 # Load data
 df_EUR <- read.csv(file.path(path, "Europe", "macroinvertebrate_EUR_tax.csv"), stringsAsFactors = FALSE)
 
-# Missing orders
-df_EUR[is.na(df_EUR$order), 1:4]
-unique(df_EUR[is.na(df_EUR$order), 2]) 
+# Missing orders and families
+df_EUR[is.na(df_EUR$family) | is.na(df_EUR$order), 1:4]
+
+# Some wrong species and genera names
+df_EUR[grepl("Bythonomus", df_EUR$species), 3] <- "Stylodrilus"
+df_EUR[grepl("Bythonomus", df_EUR$species), 4] <- c("Stylodrilus absoloni", "Stylodrilus lemani")
 
 df_EUR <- df_EUR %>%
+  
+  # Aeolosoma and Hystricosoma belong Lumbricidae family and Haplotaxida order
+  mutate(family = ifelse(grepl("Aeolosoma|Hystricosoma", genus), "Aeolosomatidae", family)) %>%
+  
+  # Stylodrilus belongs Lumbriculidae family and Lumbriculida order
+  mutate(order = ifelse(grepl("Stylodrilus", genus), "Lumbriculida", order)) %>%
+  mutate(family = ifelse(grepl("Stylodrilus", genus), "Lumbriculidae", family)) %>%
+  
+  # Dendrodrilus belongs Lumbricidae family and Haplotaxida order
+  mutate(order = ifelse(grepl("Dendrodrilus", genus), "Haplotaxida", order)) %>%
+  mutate(family = ifelse(grepl("Dendrodrilus", genus), "Lumbricidae", family)) %>%
+  
+  # Fontogammarus belongs Gammaridae family and Amphipoda order
+  mutate(order = ifelse(grepl("Fontogammarus", genus), "Amphipoda", order)) %>%
+  mutate(family = ifelse(grepl("Fontogammarus", genus), "Gammaridae", family)) %>%
+  
+  # Microhydra is synonym to Craspedacusta: belongs Gammaridae family and Amphipoda order
+  mutate(order = ifelse(grepl("Microhydra", genus), "Amphipoda", order)) %>%
+  mutate(family = ifelse(grepl("Microhydra", genus), "Gammaridae", family)) %>%
+  mutate(genus = ifelse(grepl("Microhydra", genus), "Craspedacusta", genus)) %>%
+  
+  # Micropterna belongs Limnephilidae family and Amphipoda order
+  mutate(order = ifelse(grepl("Micropterna", genus), "Amphipoda", order)) %>%
+  mutate(family = ifelse(grepl("Micropterna", genus), "Trichoptera", family)) %>%
+  
+  # Orientalina belongs Hydrobiidae family and Sorbeoconcha order
+  mutate(order = ifelse(grepl("Orientalina", genus), "Hydrobiidae", order)) %>%
+  mutate(family = ifelse(grepl("Orientalina", genus), "Sorbeoconcha", family)) %>%
+  
+  # Stylaria belongs Naididae family and Haplotaxida order
+  mutate(order = ifelse(grepl("Stylaria", genus), "Haplotaxida", order)) %>%
+  mutate(family = ifelse(grepl("Stylaria", genus), "Naididae", family)) %>%
+  
+  # Tinearia belongs Psychodidae family and Diptera order
+  mutate(order = ifelse(grepl("Tinearia", genus), "Diptera", order)) %>%
+  mutate(family = ifelse(grepl("Tinearia", genus), "Psychodidae", family)) %>%
+  
+  # Tubificidae: nonsense information
+  
+  # Vejdovskiella no identification possible
+  
+  # Physa belongs Physidae
+  mutate(family = ifelse(grepl("Physa", genus), "Physidae", family)) %>%
   
   # Nerillidae belongs to Aciculata
   mutate(order = ifelse(grepl("Nerillidae", family), "Aciculata", order)) %>%
@@ -100,16 +166,17 @@ df_EUR <- df_EUR %>%
   mutate(order = ifelse(grepl("Melanopsidae|Thiaridae", family), "Sorbeoconcha", order)) %>%
   
   # Valvatidae belongs to Triganglionata
-  mutate(order = ifelse(grepl("Valvatidae", family), "AcTriganglionataiculata", order)) %>%
+  mutate(order = ifelse(grepl("Valvatidae", family), "Triganglionata", order)) %>%
   
   # Macrostomidae belongs to Macrostomorpha
   mutate(order = ifelse(grepl("Macrostomidae", family), "Macrostomorpha", order)) %>%
   
-  # Aeolosomatidae, Capitellidae, Catenulidae, Stenostomidae: no order known (incertae sedis)
-  mutate(family = ifelse(grepl("Aeolosomatidae|Capitellidae|Catenulidae|Stenostomidae", family), NA, family)) 
+  # Maldanidae belongs to Orbiniida
+  mutate(order = ifelse(grepl("Maldanidae", family), "Orbiniida", order))
+  
 
-# Dismiss family NA
-df_EUR <- df_EUR[!is.na(df_EUR$family), ]
+# Dismiss order NA
+df_EUR <- df_EUR[!is.na(df_EUR$order), ]
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Renaming columns ####
