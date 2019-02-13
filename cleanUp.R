@@ -40,7 +40,7 @@ ALL <- within(ALL, levels(ph) <- lev)
 # Temperature Preference
 lev <- with(ALL, levels(temperature))
 lev[lev == "temp_very_cold"] <- "Very Cold"; lev[lev == "temp_cold"] <- "Cold"
-lev[lev == "temp_moderate"] <- "Moderate"; lev[lev == "temp_warm"] <- "Warm"
+lev[lev == "temp_mod"] <- "Moderate"; lev[lev == "temp_warm"] <- "Warm"
 lev[lev == "temp_ind"] <- "Indifferent"
 ALL <- within(ALL, levels(temperature) <- lev)
 
@@ -61,7 +61,7 @@ ALL <- within(ALL, levels(locomotion) <- lev)
 # Respiration
 lev <- with(ALL, levels(respiration))
 lev[lev == "resp_atmospheric"] <- "Atmospheric"; lev[lev == "resp_gills"] <- "Gills"
-lev[lev == "resp_plastron"] <- "Plastron"; lev[lev == "resp_Spiracle"] <- "Spiracle"
+lev[lev == "resp_plastron"] <- "Plastron"; lev[lev == "resp_sspiracle"] <- "Spiracle"
 lev[lev == "resp_tegument"] <- "Tegument"
 ALL <- within(ALL, levels(respiration) <- lev)
  
@@ -101,7 +101,7 @@ ALL <- within(ALL, levels(voltinism) <- lev)
 
 # ------------------------------------------------------ #
 # --- Rename columns
-new.names <- c("Order", "Family", "Region", "pH Preference", "Temperature Preference", "Feeding Mode", "Locomotion",
+new.names <- c("Order", "Family", "Region", "pH", "Temperature", "Feeding Mode", "Locomotion",
               "Respiration", "Drift", "Life Duration", "Size", "Reproduction", "Aquatic Stages", "Voltinism") 
 
 names(ALL) <- new.names

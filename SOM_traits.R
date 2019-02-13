@@ -18,11 +18,13 @@ library(beepr)
 
 
 # --------------------------------------------------------------------------------------------------------------- #
-#### Load data ####
-EUR <- read.table(file.path(path, "final", "macroinvertebrate_EUR_bin.csv"), sep = ",", row.names = 1, header = TRUE)
-NAM <- read.table(file.path(path, "final", "macroinvertebrate_NAM_bin.csv"), sep = ",", row.names = 1, header = TRUE)
-AUS <- read.table(file.path(path, "final", "macroinvertebrate_AUS_bin.csv"), sep = ",", row.names = 1, header = TRUE)
+#### Preparation ####
+source("~/Schreibtisch/Thesis/scripts/stats/prepDat.R")
 
+
+# --------------------------------------------------------------------------------------------------------------- #
+#### Load data ####
+ALL <- read.table(file.path(path, "final", "macroinvertebrate_ALL_bin_final.csv"), sep = ",", row.names = 1, header = TRUE)
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Saving plots ####
@@ -31,35 +33,29 @@ setwd("~/Schreibtisch/Thesis/final_paper/Figures/results/SOM")
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Number of Cells for SOM Grid
-5*sqrt(length(EUR[, 4:ncol(EUR)]))
-# 32 cells are sufficient
-
-
-0.1*length(EUR[, 4:ncol(EUR)])
-# 4 Nodes
+5*sqrt(length(ALL[, 4:ncol(ALL)]))
+# 28 cells are sufficient
 
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### SOM: Europe ####
-names(EUR)
+EUR <- ALL[ALL$Region == "Europe", ]
 
-# --- Trait used voltinism
 EUR_dat <- EUR[4:ncol(EUR)]
 
 EUR_dat <- as.matrix(EUR_dat)
 
 # --- Set grid
-grid_dim <- somgrid(4, 4, "hexagonal")
+grid_dim <- somgrid(6, 6, "hexagonal")
 
 # --- Compute map
 set.seed(123)
-som_EUR <- som(EUR_dat, grid = grid_dim, rlen = 8000); beep(4)
+som_EUR <- som(EUR_dat, grid = grid_dim, rlen = 500); beep(4)
 
 # Plot training process
 plot(som_EUR, type = "changes")
 
 # --- Display as heatmap for different traits and their modalities
-str(som_EUR)
 codes_EUR <- as.data.frame(getCodes(som_EUR))
 names(codes_EUR)
 
@@ -144,26 +140,6 @@ plot(som_EUR, type = "property", property = codes_EUR$resp_atmospheric, main = "
 dev.off()
 
 # --------------------------------------------------------- #
-# Drift
-pdf(file = "SOM_EUR_drift_low.pdf")
-plot(som_EUR, type = "property", property = codes_EUR$drift_low, main = "Low")
-dev.off()
-
-pdf(file = "SOM_EUR_drift_high.pdf")
-plot(som_EUR, type = "property", property = codes_EUR$drift_high, main = "High")
-dev.off()
-
-# --------------------------------------------------------- #
-# Life Duration
-pdf(file = "SOM_EUR_life1.pdf")
-plot(som_EUR, type = "property", property = codes_EUR$life1, main = "< 1 Month")
-dev.off()
-
-pdf(file = "SOM_EUR_life2.pdf")
-plot(som_EUR, type = "property", property = codes_EUR$life2, main = "> 1 Month")
-dev.off()
-
-# --------------------------------------------------------- #
 # Size
 pdf(file = "SOM_EUR_size_small.pdf")
 plot(som_EUR, type = "property", property = codes_EUR$size_small, main = "Small")
@@ -175,24 +151,6 @@ dev.off()
 
 pdf(file = "SOM_EUR_size_large.pdf")
 plot(som_EUR, type = "property", property = codes_EUR$size_large, main = "Large")
-dev.off()
-
-# --------------------------------------------------------- #
-# Aquatic Stage
-pdf(file = "SOM_EUR_stage_eggs.pdf")
-plot(som_EUR, type = "property", property = codes_EUR$stage1, main = "Just Eggs")
-dev.off()
-
-pdf(file = "SOM_EUR_stage_larva.pdf")
-plot(som_EUR, type = "property", property = codes_EUR$stage2, main = "Up to Larva")
-dev.off()
-
-pdf(file = "SOM_EUR_stage_pupa.pdf")
-plot(som_EUR, type = "property", property = codes_EUR$stage3, main = "Up to Pupae")
-dev.off()
-
-pdf(file = "SOM_EUR_stage_adult.pdf")
-plot(som_EUR, type = "property", property = codes_EUR$stage4, main = "Up to Adult")
 dev.off()
 
 # --------------------------------------------------------- #
@@ -234,7 +192,7 @@ dev.off()
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### SOM: North America ####
-names(NAM)
+NAM <- ALL[grepl("NAM", ALL$region), ]
 
 # --- Trait used voltinism
 NAM_dat <- NAM[4:ncol(NAM)]
@@ -242,7 +200,7 @@ NAM_dat <- NAM[4:ncol(NAM)]
 NAM_dat <- as.matrix(NAM_dat)
 
 # --- Set grid
-grid_dim <- somgrid(10, 10, "hexagonal")
+grid_dim <- somgrid(6, 6, "hexagonal")
 
 # --- Compute map
 set.seed(123)
@@ -428,7 +386,7 @@ dev.off()
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### SOM: Australia ####
-names(AUS)
+AUS <- ALL[grepl("AUS", ALL$region), ]
 
 # --- Trait used voltinism
 AUS_dat <- AUS[4:ncol(AUS)]
@@ -436,7 +394,7 @@ AUS_dat <- AUS[4:ncol(AUS)]
 AUS_dat <- as.matrix(AUS_dat)
 
 # --- Set grid
-grid_dim <- somgrid(10, 10, "hexagonal")
+grid_dim <- somgrid(6, 6, "hexagonal")
 
 # --- Compute map
 set.seed(123)

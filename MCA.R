@@ -6,52 +6,49 @@
 # --------------------------------------------------------------------------------------------------------------- #
 #### Working directory ####
 path <- "~/Schreibtisch/Thesis/data"
-plot <- "~/Schreibtisch/Thesis/final_paper/Figures/results"
+plot <- "~/Schreibtisch/Thesis/final_paper/Figures/results/MCA"
 
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Packages ####
 library(tidyverse)
+library(data.table)
 library(vegan)
 library(cluster)
 library(FactoMineR)
 library(factoextra)
 library(beepr)      # beep functions
 library(RColorBrewer)
-library(ggpubr)     # "Publication Ready" theme
-library(ggsci)      # Scientific journal palettes
+# library(ggpubr)     # "Publication Ready" theme
+# library(ggsci)      # Scientific journal palettes
 
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### Change names of categories ####
 source("~/Schreibtisch/Thesis/scripts/stats/cleanUp.R")
+source("~/Schreibtisch/Thesis/scripts/stats/prepDat.R")
 
 
 # --------------------------------------------------------------------------------------------------------------- #
-#### Check Trait Modalities for Double Entries ####
-check <- read.table(file.path(path, "final", "macroinvertebrate_ALL_bin_fancy.csv"), sep = ",", row.names = 1, header = TRUE)
-names(check)
+#### Prepare Data ####
 
-check <- check %>%
-  mutate(ph_sum = rowSums(.[grepl("ph_", names(check))]),
-         feed_sum = rowSums(.[grepl("feed_", names(check))]),
-         loc_sum = rowSums(.[grepl("loc_", names(check))]),
-         resp_sum = rowSums(.[grepl("resp_", names(check))]),
-         drift_sum = rowSums(.[grepl("drift_", names(check))]),
-         life_sum = rowSums(.[grepl("life", names(check))]),
-         size_sum = rowSums(.[grepl("size_", names(check))]),
-         volt_sum = rowSums(.[grepl("volt_", names(check))]),
-         stage_sum = rowSums(.[grepl("stage_", names(check))]),
-         rep_sum = rowSums(.[grepl("rep_", names(check))]),
-         ph_sum = rowSums(.[grepl("temp_", names(check))]),
-         total_sum = rowSums(.[4:ncol(check)])) %>%
-  filter(total_sum > 10)
+
+
+# --------------------------------------------------------------------------------------------------------------- #
+#### Load Data ####
+NMDS <- read.table(file.path(path, "final", "macroinvertebrate_ALL_bin_final.csv"), sep = ",", row.names = 1, header = TRUE)
+MCA <- read.table(file.path(path, "final", "macroinvertebrate_ALL_mod_final.csv"), sep = ",", check.names = FALSE)
+
+
+# --------------------------------------------------------------------------------------------------------------- #
+#### Preparation ####
+checkdt <- data.table(check)
+checkdt[Region == "Australia", lapply(.SD, function(y) sum(y)/nrow(checkdt[grepl("Australia", check$Region), ])), .SDcols = names(checkdt) %like% ".*sum"]
 
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### NMDS ####
-# --- Load data
-trait_fin <- read.table(file.path(path, "final", "macroinvertebrate_ALL_bin_fancy.csv"), sep = ",", row.names = 1, header = TRUE)
+trait_fin <- NMDS
 names(trait_fin)
 
 # --- Distance Matrix
@@ -67,20 +64,11 @@ trait_fin <- trait_fin %>%
 dist_trait <- vegdist(trait_fin[, 4:ncol(trait_fin)], method = 'jaccard')
 
 # --- Run NMDS
-nmds <- metaMDS(dist_trait); beep(4)
-stressplot(nmds)
+nmds <- metaMDS(dist_trait, k = 2); beep(4)
+stressplot(nmds) # Stress 0.167
 plot(nmds, type = 'text') 
 
-
-# Outlier: 110, and maybe 17
-trait_fin <- trait_fin[-c(9, 98), ]
-dist_trait <- vegdist(trait_fin[, 4:ncol(trait_fin)], method = 'jaccard')
-
-set.seed(123)
-nmds <- metaMDS(dist_trait); beep(4)
-
-stressplot(nmds) # Stress: 0.2
-plot(nmds, type = 'text') 
+# No extreme outliers
 
 # --- Plot NMDS
 scores <- as.data.frame(scores(nmds)) # Site scores
@@ -105,8 +93,8 @@ ggplot() +
 ggsave("trait_NMDS.pdf", path = plot)
 
 
-# --------------------------------------------------------------------------------------------------------------- #
 #### PERMANOVA ####
+# --------------------------------------------------------------------------------------------------------------- #
 trait_pmv <- adonis(dist_trait ~ Region, data = trait_fin, 
                     permutations = 999, 
                     method = 'bray'); beep(4)
@@ -123,19 +111,16 @@ dev.off()
 
 # --------------------------------------------------------------------------------------------------------------- #
 #### MCA ####
-
-# ---- Load Data
-ALL <- read.table(file.path(path, "final", "macroinvertebrate_ALL_mod_fancy.csv"), sep = ",", check.names = FALSE)
-summary(ALL)
-
-# Remove outliers (see above NMDS)
-ALL <- ALL[, -c(17, 110)]
+summary(MCA)
 
 # --- MCA
-mca_ALL <- MCA(ALL[3:ncol(ALL)], graph = FALSE)
+mca_ALL <- MCA(MCA[3:ncol(MCA)], graph = FALSE)
+
+# --- Investigate via FactoInvestigate
+# Investigate(mca_ALL, file = "MCA.Rmd", document = c("word_document", "pdf_document"))
 
 # Biplot
-cats = apply(ALL[3:ncol(ALL)], 2, function(x) nlevels(as.factor(x)))
+cats <- apply(MCA[3:ncol(MCA)], 2, function(x) nlevels(as.factor(x)))
 cats
 
 MCA_vars <- data.frame(mca_ALL$var$coord, Variable = rep(names(cats), cats))
@@ -160,7 +145,7 @@ ggplot(data = MCA_obs, aes(x = Dim.1, y = Dim.2)) +
   geom_hline(yintercept = 0, colour = "gray70") +
   geom_vline(xintercept = 0, colour = "gray70") +
   geom_point(colour = "gray50", alpha = 0.1) +
-  xlim(-1.7, 2) +
+  xlim(-1.5, 2.5) +
   ylim(-1, 2.5) +
   # geom_density2d(colour = "gray80") +
   
@@ -180,8 +165,8 @@ ggplot(data = MCA_obs, aes(x = Dim.3, y = Dim.4)) +
   geom_hline(yintercept = 0, colour = "gray70") +
   geom_vline(xintercept = 0, colour = "gray70") +
   geom_point(colour = "gray50", alpha = 0.1) +
-  xlim(-2, 2) +
-  ylim(-2, 2) +
+  # xlim(-2, 2) +
+  # ylim(-2, 2) +
   # geom_density2d(colour = "gray80") +
   
   geom_text(data = MCA_vars,
@@ -194,7 +179,7 @@ ggplot(data = MCA_obs, aes(x = Dim.3, y = Dim.4)) +
   ylab("Dim 4 %%%")
 
 
-ggsave("MCA_ALL_biplot_density_dim34.pdf", path = plot)
+ggsave("MCA_ALL_biplot_density_dim34.pdf", spath = plot)
 
 # --- Contribution of variables
 fviz_mca_var(mca_ALL, col.var = "contrib",
@@ -204,6 +189,14 @@ fviz_mca_var(mca_ALL, col.var = "contrib",
              ggtheme = theme_minimal())
 
 ggsave("MCA_ALL_vars_contribution.png", path = plot)
+
+
+# --- Contribution of variables to dimensions
+fviz_contrib(mca_ALL, choice = "var", axes = 1:2, top = 20)
+
+
+# --- Representation of variables by dimensions
+fviz_cos2(mca_ALL, choice = "var", axes = 1:4)
 
 
 # --- Correlation between principal dimenions and variables
@@ -219,38 +212,10 @@ fviz_ellipses(mca_ALL, c(2, 3), geom = "point")
 fviz_ellipses(mca_ALL, c(4, 5), geom = "point")
 fviz_ellipses(mca_ALL, c(6, 7), geom = "point")
 fviz_ellipses(mca_ALL, c(8, 9), geom = "point")
-fviz_ellipses(mca_ALL, 10, geom = "point", palette = "startrek")
 
 
 ggsave("MCA_ellipse.pdf", path = plot)
 
 
-# --- Test
-fviz_mca_var(mca_ALL, choice = "mca.cor", repel = TRUE)
-
-
-# ------------------------------------------------------------- #
-# ---- Alternative ----
-str(ALL)
-
-# Classic MCA with plots
-mca_ALL <- MCA(ALL[2:ncol(ALL)])
-summary(mca_ALL)
-
-# Plot of individual rows
-plot(mca_ALL, invisible = c("var"), cex=0.7)
-
-# Plot with levels colored homogenous for each cateory
-plot(mca_ALL, invisible = c("ind"), hab = "quali") 
-
-# Plots with confidence ellipses
-plotellipses(mca_ALL, keepvar = c("region", "ph", "temperature", "feed_mode"))
-
-# Top 10 most important categories
-plot(mca_ALL, invisible = c("ind"), hab = "quali", selectMod = "cos2 10") 
-
-# Top 20 categories contributing to MCA
-plot(mca_ALL, invisible = c("ind"), hab = "quali", selectMod = "contrib 20")
-
-# Top 10 most important categories and most important individuals
-plot(mca_ALL, hab = "quali", select = "cos2 10", selectMod = "cos2 10", xlim = c(0, 2), ylim = c(-1, 2)) 
+# --- Clustering of MCA
+mca_hcpc <- HCPC(mca_ALL)

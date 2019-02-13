@@ -19,14 +19,29 @@ library(beepr)
 
 
 # --------------------------------------------------------------------------------------------------------------- #
+#### Preparation ####
+source("~/Schreibtisch/Thesis/scripts/stats/prepDat.R")
+
+
+# --------------------------------------------------------------------------------------------------------------- #
+#### Load Data #### 
+ALL <- read.table(file.path(path, "final", "macroinvertebrate_ALL_int_final.csv"), sep = ",", row.names = 1, header = TRUE)
+
+
+# --------------------------------------------------------------------------------------------------------------- #
+#### Saving plots ####
+setwd("~/Schreibtisch/Thesis/final_paper/Figures/results/SOM")
+
+
+# --------------------------------------------------------------------------------------------------------------- #
 #### Clustering SOM: Europe #### 
-data <- read.table(file.path(path, "final", "macroinvertebrate_EUR_int.csv"), sep = ",", row.names = 1, header = TRUE)
+data <- ALL[grepl("EUR", ALL$region), ]
 
 # ---- SOM ---- #
 matrix <- as.matrix(data[4:ncol(data)])
 
 # Set grid
-grid_dim <- somgrid(10, 10, "hexagonal")
+grid_dim <- somgrid(6, 6, "hexagonal")
 
 # Calculate map
 set.seed(123)
@@ -67,7 +82,7 @@ top10 <- order_count[rev(order(order_count$Freq)),"Var1"][1:10]
 data$group <- ifelse(as.character(data$order) %in% top10, as.character(data$order), "Other")
 data$group <- factor(data$group, levels=c(top10, "Other"))
 
-png(filename = "~/Schreibtisch/Thesis/data/final/plots/SOM_EUR_cluster.png")
+png(filename = "SOM_EUR_cluster.pdf")
 par(mfrow = c(1,1))
 plot(som_model, type = "mapping", main = "Clustering SOM: Europe", bgcol = rainbow(5, s = 0.3)[som_cluster], pch = c(15:25)[data$group]) 
 legend(x = "topleft", legend = levels(data$group), pch = c(15:25), cex = 0.7, bty = "n")
@@ -81,13 +96,13 @@ data$cluster <- cluster_assignment
 
 # ------------------------------------------------------------- #
 # ---- Clustering SOM: North America ---- 
-data <- read.table(file.path(path, "final", "macroinvertebrate_NAM_int.csv"), sep = ",", row.names = 1, header = TRUE)
+data <- ALL[grep("NAM", ALL$region), ]
 
 # ---- SOM ---- #
 matrix <- as.matrix(data[4:ncol(data)])
 
 # Set grid
-grid_dim <- somgrid(10, 10, "hexagonal")
+grid_dim <- somgrid(6, 6, "hexagonal")
 
 # Calculate map
 set.seed(123)
@@ -127,7 +142,7 @@ top10 <- order_count[rev(order(order_count$Freq)),"Var1"][1:10]
 data$group <- ifelse(as.character(data$order) %in% top10, as.character(data$order), "Other")
 data$group <- factor(data$group, levels=c(top10, "Other"))
 
-png(filename = "~/Schreibtisch/Thesis/data/final/plots/SOM_NAM_cluster.png")
+png(filename = "SOM_NAM_cluster.pdf")
 par(mfrow = c(1,1))
 plot(som_model, type = "mapping", main = "Clustering SOM: North America", bgcol = rainbow(7, s = 0.3)[som_cluster], pch = c(15:25)[data$group]) 
 legend(x = "topleft", legend = levels(data$group), pch = c(15:25), cex = 0.7, bty = "n")
@@ -140,13 +155,13 @@ data$cluster <- cluster_assignment
 
 # ------------------------------------------------------------- #
 # ---- Clustering SOM: Australia ---- 
-data <- read.table(file.path(path, "final", "macroinvertebrate_AUS_int.csv"), sep = ",", row.names = 1, header = TRUE)
+data <- ALL[grep("AUS", ALL$region), ]
 
 # ---- SOM ---- #
 matrix <- as.matrix(data[4:ncol(data)])
 
 # Set grid
-grid_dim <- somgrid(10, 10, "hexagonal")
+grid_dim <- somgrid(6, 6, "hexagonal")
 
 # Calculate map
 set.seed(123)
@@ -185,7 +200,7 @@ top10 <- order_count[rev(order(order_count$Freq)),"Var1"][1:10]
 data$group <- ifelse(as.character(data$order) %in% top10, as.character(data$order), "Other")
 data$group <- factor(data$group, levels=c(top10, "Other"))
 
-png(filename = "~/Schreibtisch/Thesis/data/final/plots/SOM_AUS_cluster.png")
+png(filename = "SOM_AUS_cluster.pdf")
 par(mfrow = c(1,1))
 plot(som_model, type = "mapping", main = "Clustering SOM: Australia", bgcol = rainbow(7, s = 0.3)[som_cluster], pch = c(15:25)[data$group]) 
 legend(x = "topleft", legend = levels(data$group), pch = c(15:25), cex = 0.7, bty = "n")
